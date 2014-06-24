@@ -66,12 +66,14 @@ public class VenndNativeFollower {
         def Long lastModifiedBlockId
         def String status
         def Long refundAmount = 0
+    
         def String issuanceStatus
 
         public Payment(String inAssetValue, Long currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, Long outAmountValue, Long lastModifiedBlockIdValue, Long originalAmount, boolean unclearSource) {
             def row
             inAsset = inAssetValue
             outAsset = outAssetValue
+        
             outAmount = outAmountValue * outAssetMultiplier
             // Treat indivisible asset differently as they aren't multiplied by the satoshi factor
             if (!outAssetDivisible) {
@@ -98,8 +100,8 @@ public class VenndNativeFollower {
             currentBlock = currentBlockValue
             txid = txidValue
             lastModifiedBlockId = lastModifiedBlockIdValue
-
-            if (originalAmount <= 10000000) {
+            //No more than 10 BTC for now...:)
+            if (originalAmount <= 100000000*10) {
                 status = 'authorized'
             }
             else {
@@ -116,6 +118,10 @@ public class VenndNativeFollower {
             if (unclearSource) {
                 status = 'manual'
             }
+
+             println "status ${status}: ${originalAmount} "
+
+
 
 
             // Check if the send was performed TO an address registered via the API
@@ -172,6 +178,7 @@ public class VenndNativeFollower {
         confirmationsRequired = iniConfig.confirmationsRequired
         outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
         outAssetMultiplier = iniConfig.outAssetMultiplier
+        
 
         assetConfig = []
         iniConfig.asset.each { it ->

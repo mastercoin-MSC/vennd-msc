@@ -35,8 +35,10 @@ class PaymentProcessor {
         def outAmount
         def status
         def lastUpdatedBlockId
+        def inAsset
 
-        public Payment(blockIsSourceValue, txidValue, sourceAddressValue, destinationAddressValue, outAssetValue, outAmountValue, statusValue, lastUpdatedBlockIdValue) {
+
+        public Payment(blockIsSourceValue, txidValue, sourceAddressValue, destinationAddressValue, outAssetValue,inAssetValue ,outAmountValue, statusValue, lastUpdatedBlockIdValue) {
             blockIdSource = blockIsSourceValue
             txid = txidValue
             sourceAddress = sourceAddressValue
@@ -45,6 +47,7 @@ class PaymentProcessor {
             outAmount = outAmountValue
             status = statusValue
             lastUpdatedBlockId = lastUpdatedBlockIdValue
+            inAsset = inAssetValue
         }
     }
 
@@ -140,23 +143,114 @@ class PaymentProcessor {
                 def outAmount = row.outAmount
                 def status = row.status
                 def lastUpdated = row.lastUpdatedBlockId
+                //def inAsset = row.inAsset
+                def inAsset = row.outAsset
 
-                result = new Payment(blockIdSource, txid, sourceAddress, destinationAddress, outAsset, outAmount, status, lastUpdated)
+                result = new Payment(blockIdSource, txid, sourceAddress, destinationAddress, outAsset,inAsset, outAmount, status, lastUpdated)
             }
         }
 
         return result
     }
+  
+    public pay_divident(Long currentBlock, Payment payment,Long dividend_percent)
+    {
+        def sourceAddress = payment.sourceAddress
+        def blockIdSource = payment.blockIdSource
+        def asset = payment.inAsset
+        def dividend_asset = payment.outAsset
+        def amount = payment.outAmount
+        def asset_balance = 0
+
+        
+
+        log4j.info("Processing dividend payment ${payment.blockIdSource} ${payment.txid}. Sending dividend_percent ${dividend_percent } ")
+        bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
+        bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
+        // Calculate the required dividend
+        def getAssetInfo = counterpartyAPI.getAssetInfo(dividend_asset,log4j)
+
+        //assert getAssetInfo instanceof java.lang.String
+        //assert getAssetInfo != null
+        //if (!(getAssetInfo instanceof java.lang.String)) { // catch non technical error in RPC call
+        //    assert getAssetInfo.code == null
+        //}
+        log4j.info("Processing dividend getAssetInfo.supply ${getAssetInfo.supply}")
+        def numberOfTokenIssued = getAssetInfo.supply
+        def balances = counterpartyAPI.getBalances(sourceAddress)
+        //assert balance instanceof java.lang.String
+        //assert balance != null
+        //if (!(balance instanceof java.lang.String)) { // catch non technical error in RPC call
+          //  assert balance.code == null
+        //}
+
+        for (balance in balances) {
+            if (balance.asset == dividend_asset) 
+                asset_balance = balance.quantity
+        }
+
+        
+        def tokensOutThere = numberOfTokenIssued[0]-asset_balance
+
+        log4j.info("pay_divident asset_balance ${asset_balance} numberOfTokenIssued = ${numberOfTokenIssued} tokensOutThere = ${tokensOutThere} ")
+        def quantity_per_share_divident = Math.round((((amount*dividend_percent)/100)/tokensOutThere)*100000000)
+        log4j.info("pay_divident asset ${dividend_asset} asset_balance= ${asset_balance} tokensOutThere = ${tokensOutThere} quantity_per_share_divident = = ${quantity_per_share_divident} ")
 
 
 
 
-    public pay(Long currentBlock, Payment payment) {
+
+        // Create the (unsigned) counterparty dividend transaction
+    
+        def unsignedTransaction = counterpartyAPI.sendDivident(sourceAddress, quantity_per_share_divident, asset,dividend_asset, log4j)
+        assert unsignedTransaction instanceof java.lang.String
+        assert unsignedTransaction != null
+        if (!(unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
+            assert unsignedTransaction.code == null
+        }
+
+        // sign transaction
+        def signedTransaction = counterpartyAPI.signTransaction(unsignedTransaction, log4j)
+        assert signedTransaction instanceof java.lang.String
+        assert signedTransaction != null
+
+        // send transaction
+        try {
+            counterpartyAPI.broadcastSignedTransaction(signedTransaction, log4j)
+            log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+           // db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+        }
+        catch (Throwable e) {
+            log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+            db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+
+            assert e == null
+        }
+
+        // Lock bitcoin wallet
+        bitcoinAPI.lockBitcoinWallet()
+
+        log4j.info("Payment dividend ${sourceAddress} -> quantity_per_share_divident ${quantity_per_share_divident/100000000} ${asset} complete")
+        if (testMode == true) log4j.info("Test mode: Payment 12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7 -> 142UYTzD1PLBcSsww7JxKLck871zRYG5D3 " + 20000/100000000 + "${asset} complete")
+
+//        return unsignedTransaction
+
+    }
+    public pay(Long currentBlock, Payment payment,Long dividend_percent) {
         def sourceAddress = payment.sourceAddress
         def blockIdSource = payment.blockIdSource
         def destinationAddress = payment.destinationAddress
         def asset = payment.outAsset
         def amount = payment.outAmount
+
+        log4j.info("amount= {$amount} dividend_percent={$dividend_percent}")
+
+        //Calculate the payment to the address after reducing the divided
+        amount = amount*((100-dividend_percent)/100) 
+
+        amount = Math.round(amount)
+
+        log4j.info("amount= after {$amount} ")
 
         log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${payment.outAmount / 100000000} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
 
@@ -164,12 +258,18 @@ class PaymentProcessor {
         bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 
         // Create the (unsigned) counterparty send transaction
+
         def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)
+        log4j.info("pay 2!")
         assert unsignedTransaction instanceof java.lang.String
+        log4j.info("pay 3!")
         assert unsignedTransaction != null
+        log4j.info("pay 4!")
         if (!(unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
+            log4j.info("pay 5!")
             assert unsignedTransaction.code == null
         }
+        log4j.info("pay 1!")
 
         // sign transaction
         def signedTransaction = counterpartyAPI.signTransaction(unsignedTransaction, log4j)
@@ -197,10 +297,11 @@ class PaymentProcessor {
 
 //        return unsignedTransaction
     }
-
+    
 
     public static int main(String[] args) {
         def paymentProcessor = new PaymentProcessor()
+        def Long dividend_percent = 10
 
         paymentProcessor.init()
         paymentProcessor.audit()
@@ -225,14 +326,24 @@ class PaymentProcessor {
 //            if (lastPaymentBlock >= blockHeight && payment != null) {
 //                log4j.info("Payment to make but already paid already this block. Sleeping...")
 //            }
+
             if (payment != null) {
-                paymentProcessor.pay(blockHeight, payment)
-                log4j.info("Sleeping...")
+                if (payment.outAsset != 'BTC'){
+                log4j.info("payment.outAsset ${payment.outAsset}")
+                paymentProcessor.pay_divident(blockHeight, payment,dividend_percent)
+                paymentProcessor.pay(blockHeight, payment,dividend_percent)
+
+            }
+            else
+            {
+                paymentProcessor.pay(blockHeight, payment,0)
+                log4j.info("--------------BURN-------------")
+            }
+                log4j.info("Sleeping...payment.outAsset ${payment.outAsset}")
             }
             else {
-                log4j.info("No payments to make. Sleeping...")
+                log4j.info("No payments to make. Sleeping..${sleepIntervalms}.")
             }
-
             sleep(sleepIntervalms)
         }
 

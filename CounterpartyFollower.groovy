@@ -85,7 +85,7 @@ class CounterpartyFollower {
             }
             def mappingRequired = assetConfig[assetConfigIndex].mappingRequired
 
-            if (originalAmount <= 10000000) {
+            if (originalAmount <= 100000000*10) {
                 status = 'authorized'
             }
             else {
@@ -467,7 +467,8 @@ class CounterpartyFollower {
                 def String outAsset = transaction[6]
                 def feeAmount = transaction[7]
                 def feeAsset = inAsset
-
+                
+                log4j.info("outAmount -------------- :${outAmount}")
                 // int currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, String outAmountValue, int lastModifiedBlockIdValue, int originalAmount
                 // there will only be 1 output for counterparty assets but not the case for native assets - ie change
                 // form a payment object which will determine the payment direction and source and destination addresses

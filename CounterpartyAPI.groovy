@@ -265,7 +265,8 @@ class CounterpartyAPI {
         def myParams
 
         if (testMode == false) {
-            myParams = [sourceAddress, destinationAddress, asset, amount, counterpartyTransactionEncoding, null, counterpartyMultisendPerBlock, null]
+        //    myParams = [sourceAddress, destinationAddress, asset, amount, counterpartyTransactionEncoding, null, counterpartyMultisendPerBlock, null]
+              myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
 //            myParams = [sourceAddress, destinationAddress, asset, amount]
         }
         else {
@@ -301,7 +302,7 @@ class CounterpartyAPI {
         while ( ! result.done ) {
             Thread.sleep(100)
         }
-
+        log4j.info("create_send payload: done! " + result.get())
         return  result.get()
     }
 
@@ -386,7 +387,81 @@ class CounterpartyAPI {
 
         return result.get()
     }
+//    create_dividend(source, quantity_per_unit, asset, dividend_asset, encoding='multisig', pubkey=null)
+    public sendDivident(sourceAddress, quantity_per_share, asset, dividend_asset, log4j) {
+        def myParams
+        myParams = [source:sourceAddress, quantity_per_unit:quantity_per_share,asset:asset,dividend_asset:dividend_asset ,encoding:counterpartyTransactionEncoding,multisig_dust_size:counterpartyMultisendPerBlock,op_return_value:null]
+      //  myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
 
+        def result = counterpartyHttpAsync.request(POST, JSON) { req ->
+            def payloadJSON
+            def payload = [method : 'create_dividend',
+                           id: 'test',
+                           params : myParams,
+                           jsonrpc: "2.0"
+            ]
+            body = payload
+
+            payloadJSON = new groovy.json.JsonBuilder(body)
+            log4j.info("create_dividend payload: " + payloadJSON)
+
+            response.success = { resp, json ->
+                if (json.containsKey("error")) {
+                    return json.error
+                }
+
+                return json.result
+            }
+
+            response.failure = { resp ->
+                println resp
+            }
+        }
+
+        assert result instanceof java.util.concurrent.Future
+        while (!result.done) {
+            Thread.sleep(100)
+        }
+
+        return result.get()
+    }
+    //get_asset_info(assets)
+    public getAssetInfo( asset,log4j) {
+        def myParams
+        myParams = [ [asset] ,]
+
+        def result = counterpartyHttpAsync.request(POST, JSON) { req ->
+            def payloadJSON
+            def payload = [method : 'get_asset_info',
+                           id: 'test',
+                           params : myParams,
+                           jsonrpc: "2.0"
+            ]
+            body = payload
+
+            payloadJSON = new groovy.json.JsonBuilder(body)
+            log4j.info("get_asset_info payload: " + payloadJSON)
+
+            response.success = { resp, json ->
+                if (json.containsKey("error")) {
+                    return json.error
+                }
+
+                return json.result
+            }
+
+            response.failure = { resp ->
+                println resp
+            }
+        }
+
+        assert result instanceof java.util.concurrent.Future
+        while (!result.done) {
+            Thread.sleep(100)
+        }
+
+        return result.get()
+    }
 
     public CounterpartyAPI() {
         init()
