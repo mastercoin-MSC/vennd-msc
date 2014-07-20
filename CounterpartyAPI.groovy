@@ -15,6 +15,7 @@ class CounterpartyAPI {
     private String counterpartyRpcPassword
     private groovyx.net.http.AsyncHTTPBuilder counterpartyHttpAsync
     private boolean counterpartyMultisendPerBlock
+	static log4j
 
     private init() {
         // Read in ini file
@@ -33,6 +34,41 @@ class CounterpartyAPI {
         counterpartyHttpAsync.auth.basic counterpartyRpcUser, counterpartyRpcPassword
 
     }
+	
+	private sendRPCMessage(command, in_params) {
+		def paramsJSON
+        def result = counterpartyHttpAsync.request( POST, JSON) { req ->
+            body = [method : command,
+                    id : 'test',
+                    params : in_params,
+                    jsonrpc : "2.0"
+            ]
+
+            paramsJSON = new groovy.json.JsonBuilder(body)
+			log4j.info(command + " payload: " + payloadJSON)
+
+            response.success = { resp, json ->
+                if (json.containsKey("error")) {
+                    log4j.info(command + " error: " + json.error)
+                    return json.error
+                }
+				
+				if (json.result == null) {
+				    log4j.info(command + " failed - null was returned")
+				}
+
+                return json.result
+            }
+        }
+
+        assert result instanceof java.util.concurrent.Future
+        while ( ! result.done ) {
+            Thread.sleep(100)
+        }
+
+        println result
+        return result.get()
+	}
 
 
     class Payload {
@@ -82,389 +118,72 @@ class CounterpartyAPI {
     public getBalances(address) {
         def filterValue = new FilterValue('address', '==', address)
         def filters = new Filters(filterValue)
-        def params = new Payload('get_balances', filters, 'id')
-        def paramsJSON
-
-        def result = counterpartyHttpAsync.request( POST, JSON) { req ->
-            body = params
-
-            println paramsJSON = new groovy.json.JsonBuilder(body)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    println json.error
-                    return json.error
-                }
-
-                return json.result
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while ( ! result.done ) {
-            Thread.sleep(100)
-        }
-
-        println result
-        return result.get()
+		return sendRPCMessage('get_balances', filters)
     }
 
 
     public getSends(Long blockId) {
-        def paramsJSON
-
-        def result = counterpartyHttpAsync.request( POST, JSON) { req ->
-            def myParams = ["start_block":blockId,"end_block":blockId]
-            body = [method : 'get_sends',
-                    id : 'test',
-                    params : myParams,
-                    jsonrpc : "2.0"
-            ]
-
-//            println paramsJSON = new groovy.json.JsonBuilder(body)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    println json.error
-                    return json.error
-                }
-
-                return json.result
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while ( ! result.done ) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
-    }
+		return sendRPCMessage('get_sends', ["start_block":blockId,"end_block":blockId])
+	}
 
     public getIssuances(Long blockId) {
-        def paramsJSON
-
-        def result = counterpartyHttpAsync.request( POST, JSON) { req ->
-            def myParams = ["start_block":blockId,"end_block":blockId]
-            body = [method : 'get_issuances',
-                    id : 'test',
-                    params : myParams,
-                    jsonrpc : "2.0"
-            ]
-
-//            println paramsJSON = new groovy.json.JsonBuilder(body)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    println json.error
-                    return json.error
-                }
-
-                return json.result
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while ( ! result.done ) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
+		return sendRPCMessage('get_issuances', ["start_block":blockId,"end_block":blockId])
     }
 
-
-    public broadcastSignedTransaction(String signedTransaction, log4j) {
-        try {
-            def payloadJSON
-            def myParams = [method: 'broadcast_tx',
-                            id: 'test',
-                            params: [signedTransaction]
-            ]
-
-            payloadJSON = new groovy.json.JsonBuilder(myParams)
-            log4j.info("broadcast payload: " + payloadJSON)
-
-
-            def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-                body = myParams
-
-                response.success = { resp, json ->
-                    if (json.result == null) {
-                        log4j.info("broadcast failed - null was returned")
-
-                        assert json.result != null
-                    }
-
-                    return json.result
-                }
-
-                response.failure = { resp ->
-                    log4j.info("BroadcastSignedTransaction failed")
-                    assert resp.responseBase == null
-                }
-            }
-
-            assert result instanceof java.util.concurrent.Future
-            while (!result.done) {
-                Thread.sleep(100)
-            }
-
-            return result.get()
-        }
-        catch (Throwable e) {
-            assert e == null
-        }
+    public broadcastSignedTransaction(String signedTransaction) {
+		return sendRPCMessage('broadcast_tx', [signedTransaction])
     }
 
-
-    public signTransaction(String unsignedTransaction, log4j) {
-        try {
-            def payloadJSON
-            def myParams = [method: 'sign_tx',
-                            id: 'test',
-                            params: [unsignedTransaction]
-            ]
-
-            payloadJSON = new groovy.json.JsonBuilder(myParams)
-            log4j.info("sign_tx payload: " + payloadJSON)
-
-
-            def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-                body = myParams
-
-                response.success = { resp, json ->
-                    if (json.result == null) {
-                        log4j.info("sign_tx failed - null was returned")
-
-                        assert json.result != null
-                    }
-
-                    return json.result
-                }
-
-                response.failure = { resp ->
-                    log4j.info("SignTransaction failed")
-                    assert resp.responseBase == null
-                }
-            }
-
-            assert result instanceof java.util.concurrent.Future
-            while (!result.done) {
-                Thread.sleep(100)
-            }
-
-            return result.get()
-        }
-        catch (Throwable e) {
-            assert e == null
-        }
+    public signTransaction(String unsignedTransaction) {
+		return sendRPCMessage('sign_tx', [unsignedTransaction])
     }
 
-
-    public createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j) {
+    public createSend(sourceAddress, destinationAddress, asset, amount, testMode) {
         def myParams
 
         if (testMode == false) {
-        //    myParams = [sourceAddress, destinationAddress, asset, amount, counterpartyTransactionEncoding, null, counterpartyMultisendPerBlock, null]
-              myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
+              myParams = ["source":sourceAddress,"destination":destinationAddress,"asset":asset,"quantity":amount,"encoding":counterpartyTransactionEncoding,"allow_unconfirmed_inputs":counterpartyMultisendPerBlock]
+//            myParams = [sourceAddress, destinationAddress, asset, amount, counterpartyTransactionEncoding, null, counterpartyMultisendPerBlock, null]
 //            myParams = [sourceAddress, destinationAddress, asset, amount]
+
         }
         else {
-            myParams = ['12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7', '142UYTzD1PLBcSsww7JxKLck871zRYG5D3', asset, 20000, counterpartyTransactionEncoding, null, counterpartyMultisendPerBlock]  // in test mode send only just enough for dust
+            myParams = ["source":'12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7',"destination":'142UYTzD1PLBcSsww7JxKLck871zRYG5D3',"asset":asset,"quantity":20000]  // in test mode send only just enough for dust
         }
+		
+		return sendRPCMessage('create_send', myParams)
+	}
 
-        def result = counterpartyHttpAsync.request( POST, JSON) { req ->
-            def payloadJSON
-            def payload = [method : 'create_send',
-                           id : 'test',
-                           params : myParams,
-                           jsonrpc : "2.0"
-            ]
-            body = payload
-
-            payloadJSON = new groovy.json.JsonBuilder(body)
-            log4j.info("create_send payload: " + payloadJSON)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    return json.error
-                }
-
-                return json.result
-            }
-
-            response.failure = { resp ->
-                println resp
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while ( ! result.done ) {
-            Thread.sleep(100)
-        }
-        log4j.info("create_send payload: done! " + result.get())
-        return  result.get()
-    }
-
-
-    public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value, log4j) {
-        try {
-            def payloadJSON
-            def myParams = [method: 'create_broadcast',
-                            id: 'test',
-                            params: [sourceAddress, feeFraction, text, timestamp, value]
-            ]
-
-            payloadJSON = new groovy.json.JsonBuilder(myParams)
-            log4j.info("create_broadcast payload: " + payloadJSON)
-
-
-            def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-                body = myParams
-
-                response.success = { resp, json ->
-                    if (json.result == null) {
-                        log4j.info("CreateBroadcast failed - null was returned")
-
-                        assert json.result != null
-                    }
-
-                    return json.result
-                }
-
-                response.failure = { resp ->
-                    log4j.info("CreateBroadcast failed")
-                    assert resp.responseBase == null
-                }
-            }
-
-            assert result instanceof java.util.concurrent.Future
-            while (!result.done) {
-                Thread.sleep(100)
-            }
-
-            return result.get()
-        }
-        catch (Throwable e) {
-            assert e == null
-        }
+    public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value) {
+		return sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
     }
 
 //    create_issuance(source, asset, quantity, divisible, description
-    public createIssuance(sourceAddress, asset, quantity, divisible, description, log4j) {
-        def myParams
-        myParams = [sourceAddress, asset, quantity, divisible, description]
+    public createIssuance(sourceAddress, asset, quantity, divisible, description) {
+        return sendRPCMessage('create_issuance',[sourceAddress, asset, quantity, divisible, description])
+	}
 
-        def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-            def payloadJSON
-            def payload = [method : 'create_issuance',
-                           id: 'test',
-                           params : myParams,
-                           jsonrpc: "2.0"
-            ]
-            body = payload
-
-            payloadJSON = new groovy.json.JsonBuilder(body)
-            log4j.info("create_send payload: " + payloadJSON)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    return json.error
-                }
-
-                return json.result
-            }
-
-            response.failure = { resp ->
-                println resp
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while (!result.done) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
-    }
-//    create_dividend(source, quantity_per_unit, asset, dividend_asset, encoding='multisig', pubkey=null)
-    public sendDivident(sourceAddress, quantity_per_share, asset, dividend_asset, log4j) {
-        def myParams
+	//    create_dividend(source, quantity_per_unit, asset, dividend_asset, encoding='multisig', pubkey=null)
+    public sendDividend(sourceAddress, quantity_per_share, asset, dividend_asset) {
+	    def myParams
         myParams = [source:sourceAddress, quantity_per_unit:quantity_per_share,asset:asset,dividend_asset:dividend_asset ,encoding:counterpartyTransactionEncoding,multisig_dust_size:counterpartyMultisendPerBlock,op_return_value:null]
-      //  myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
-
-        def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-            def payloadJSON
-            def payload = [method : 'create_dividend',
-                           id: 'test',
-                           params : myParams,
-                           jsonrpc: "2.0"
-            ]
-            body = payload
-
-            payloadJSON = new groovy.json.JsonBuilder(body)
-            log4j.info("create_dividend payload: " + payloadJSON)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    return json.error
-                }
-
-                return json.result
-            }
-
-            response.failure = { resp ->
-                println resp
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while (!result.done) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
-    }
+		//  myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
+		return sendRPCMessage('create_dividend', myParams)
+	}
+	
     //get_asset_info(assets)
-    public getAssetInfo( asset,log4j) {
-        def myParams
-        myParams = [ [asset] ,]
-
-        def result = counterpartyHttpAsync.request(POST, JSON) { req ->
-            def payloadJSON
-            def payload = [method : 'get_asset_info',
-                           id: 'test',
-                           params : myParams,
-                           jsonrpc: "2.0"
-            ]
-            body = payload
-
-            payloadJSON = new groovy.json.JsonBuilder(body)
-            log4j.info("get_asset_info payload: " + payloadJSON)
-
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    return json.error
-                }
-
-                return json.result
-            }
-
-            response.failure = { resp ->
-                println resp
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while (!result.done) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
+    public getAssetInfo(asset) {
+		sendRPCMessage('get_asset_info', [ [asset] ,])
+	}
+ 
+	// TODO this is not in the API. Why was it written???
+    public getBurn() {
+		return sendRPCMessage('get_asset_info', [ 'field': 'burned'])
     }
 
-    public CounterpartyAPI() {
+    public CounterpartyAPI(logger) {
         init()
+		log4j = logger
     }
 
 }

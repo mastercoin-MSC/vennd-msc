@@ -13,22 +13,19 @@
 import org.apache.log4j.*
 import groovy.sql.Sql
 
-class CounterpartyFollower {
+class MastercoinFollower {
     static logger
     static log4j
-    static counterpartyAPI
+    static mastercoinAPI
     static bitcoinAPI
-    static satoshi = 100000000					 
+    static satoshi = 100000000
     static int inceptionBlock
     static assetConfig
     static boolean testMode
     static int confirmationsRequired
     static int sleepIntervalms
     static String databaseName
-    static assetConfig
-
-    static db
-
+	
     public class Payment {
         def String inAsset
         def Long currentBlock
@@ -44,17 +41,16 @@ class CounterpartyFollower {
         public Payment(String inAssetValue, Long currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, String outAssetTypeValue, Long outAmountValue, Long lastModifiedBlockIdValue, Long originalAmount) {
             def row
             inAsset = inAssetValue
-            outAsset = outAssetValue			
+            outAsset = outAssetValue
             outAmount = outAmountValue
             currentBlock = currentBlockValue
 			outAssetType = outAssetTypeValue
-			
             txid = txidValue
             lastModifiedBlockId = lastModifiedBlockIdValue
             def assetConfigIndex = assetConfig.findIndexOf { a ->
-                a.counterpartyAssetName == inAssetValue
-            }
-			
+                a.mastercoinAssetName == inAssetValue
+            }		
+
             if (originalAmount <= 10000000) {
                 status = 'authorized'
             }
@@ -62,9 +58,9 @@ class CounterpartyFollower {
                 status = 'valid'
             }
 
-			// REMOVED SUPPORT FOR API ADDRESSES						
-            sourceAddress = destinationAddressValue
-			destinationAddress = sourceAddressValue          
+			// REMOVED SUPPORT FOR API ADDRESSES			
+			sourceAddress = destinationAddressValue
+			destinationAddress = sourceAddressValue        
         }
     }
 
@@ -72,14 +68,14 @@ class CounterpartyFollower {
 
         // Set up some log4j stuff
         logger = new Logger()
-        PropertyConfigurator.configure("CounterpartyFollower_log4j.properties")
+        PropertyConfigurator.configure("MastercoinFollower_log4j.properties")
         log4j = logger.getRootLogger()
 
-		counterpartyAPI = new CounterpartyAPI(log4j)
+		mastercoinAPI = new MastercoinAPI(log4j)
         bitcoinAPI = new BitcoinAPI()
 		
         // Read in ini file
-        def iniConfig = new ConfigSlurper().parse(new File("CounterpartyFollower.ini").toURL())
+        def iniConfig = new ConfigSlurper().parse(new File("MastercoinFollower.ini").toURL())
         inceptionBlock = iniConfig.inceptionBlock
         testMode = iniConfig.testMode
         sleepIntervalms = iniConfig.sleepIntervalms
@@ -89,9 +85,10 @@ class CounterpartyFollower {
 		assetConfig = Asset.readAssets("AssetInformation.ini")
 
         // init database
+        def row
         db = Sql.newInstance("jdbc:sqlite:${databaseName}", "org.sqlite.JDBC")
         db.execute("PRAGMA busy_timeout = 1000")
-        DBCreator.createDB(db)
+		DBCreator.createDB(db)
     }
 
     public Audit() {
@@ -102,19 +99,19 @@ class CounterpartyFollower {
     public processSeenBlock(currentBlock) {
         log4j.info("Block ${currentBlock}: seen")
 
-        db.execute("insert into counterpartyBlocks values (${currentBlock}, 'seen', 0)")
+        db.execute("insert into mastercoinBlocks values (${currentBlock}, 'seen', 0)")
     }
 
 
     public lastProcessedBlock() {
         def Long result
 
-        def row = db.firstRow("select max(blockId) from counterpartyBlocks where status in ('processed','error')")
+        def row = db.firstRow("select max(blockId) from mastercoinBlocks where status in ('processed','error')")
 
         assert row != null
 
         if (row[0] == null) {
-            db.execute("insert into counterpartyBlocks values(${inceptionBlock}, 'processed', 0)")
+            db.execute("insert into mastercoinBlocks values(${inceptionBlock}, 'processed', 0)")
             result = inceptionBlock
         }
         else {
@@ -128,7 +125,7 @@ class CounterpartyFollower {
     public lastBlock() {
         def Long result
 
-        def row = db.firstRow("select max(blockId) from counterpartyBlocks")
+        def row = db.firstRow("select max(blockId) from mastercoinBlocks")
 
         assert row != null
 
@@ -144,7 +141,7 @@ class CounterpartyFollower {
 
 
 
-
+	// Should check the asset name/id's
     public processBlock(Long currentBlock) {
         def timeStart
         def timeStop
@@ -153,15 +150,14 @@ class CounterpartyFollower {
         def issuances
 
         timeStart = System.currentTimeMillis()
-        sends = counterpartyAPI.getSends(currentBlock)
-		
-		// TODO add outasset type support
+        sends = mastercoinAPI.getSends(currentBlock)
+
         // Process sends
         log4j.info("Block ${currentBlock}: processing " + sends.size() + " sends")
         def transactions = []
         for (send in sends) {
             //assert send instanceof HashMap
-
+			// TODO add outasset type support
             def inputAddresses = []
             def outputAddresses = []
             def inAsset = ""
@@ -171,8 +167,8 @@ class CounterpartyFollower {
             def fee = 0.0
             def txFee = 0.0
             def txid = ""
-            def source = send.source
-            def destination = send.destination
+            def source = send.sendingaddress
+            def destination = send.referenceaddress			
             def serviceAddress = "" // the service address which was sent to
 			def outAssetType = ""
 
@@ -181,34 +177,32 @@ class CounterpartyFollower {
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
-				if (send.source != assetConfig[counter].counterpartyAddress && send.destination == assetConfig[counter].counterpartyAddress) {
+                if (send.sendingaddress != assetConfig[counter].mastercoinAddress && send.referenceaddress == assetConfig[counter].mastercoinAddress && send.direction == "in") {
                     notFound = false
-                    inAsset = assetConfig[counter].counterpartyAssetName
+                    inAsset = assetConfig[counter].mastercoinAssetName
                     outAsset = assetConfig[counter].nativeAssetName
-                    fee = assetConfig[counter].feePercentage
-                    txFee = assetConfig[counter].txFee
-                    serviceAddress = assetConfig[counter].counterpartyAddress
 					outAssetType = Asset.NATIVE_TYPE
-                } else if (send.source != assetConfig[counter].counterpartyToMastercoinAddress && send.destination == assetConfig[counter].counterpartyToMastercoinAddress) { 
-                    notFound = false
-                    inAsset = assetConfig[counter].counterpartyAssetName
-                    outAsset = assetConfig[counter].mastercoinAssetName
                     fee = assetConfig[counter].feePercentage
                     txFee = assetConfig[counter].txFee
-                    serviceAddress = assetConfig[counter].counterpartyToMastercoinAddress
-					outAssetType = Asset.MASTRERCOIN_TYPE
+                    serviceAddress = assetConfig[counter].mastercoinAddress
+                } else if (send.source != assetConfig[counter].mastercoinToCounterpartyAddress && send.destination == assetConfig[counter].mastercoinToCounterpartyAddress) { 
+                    notFound = false
+                    inAsset = assetConfig[counter].mastercoinAssetName
+                    outAsset = assetConfig[counter].counterpartyAssetName
+                    fee = assetConfig[counter].feePercentage
+                    txFee = assetConfig[counter].txFee
+                    serviceAddress = assetConfig[counter].mastercoinToCounterpartyAddress
+					outAssetType = Asset.COUNTERPARTY_TYPE
 				}
 
                 counter++
             }
-			
-			// REMOVED SUPPORT FOR API ADDRESSES
 
             // Record the send
-			// TODO fix this to handle the case of sending to mastercoin
+			// TODO fix this to handle the case of sending to counterparty
             if (notFound == false) {
-				txid = send.tx_hash
-                inAmount = send.quantity			                   
+				txid = send.txid    
+				inAmount = send.amount				
 
                 // Calculate fee
                 def amountMinusTX
@@ -246,25 +240,25 @@ class CounterpartyFollower {
                 inputAddresses.add(source)
                 outputAddresses.add(destination)
 
-                transactions.add([txid, inputAddresses, outputAddresses, inAmount, inAsset, outAmount, outAsset, calculatedFee, serviceAddress, outAssetType])
+                transactions.add([txid, inputAddresses, outputAddresses, inAmount, inAsset, outAmount, outAsset, calculatedFee, serviceAddress,outAssetType])
                 log4j.info("Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${serviceAddress} (${outAssetType}) ${inAmount/satoshi} ${inAsset} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${inAsset} fee collected)")
             }
         }
 
 
-        issuances = counterpartyAPI.getIssuances(currentBlock)
-        // Process issuances
-        log4j.info("Block ${currentBlock}: processing " + issuances.size() + " issuances")
-//        def issuanceTransactions = []
-        for (issuance in issuances) {
-            assert issuance instanceof HashMap
+		// For now - we ignore this...
+		// TODO there is no issuance - they are usual sends        
+		// Process issuances
+        log4j.info("Block ${currentBlock}: processing " + sends.size() + " issuances")
+        for (issuance in []) {
+            // assert issuance instanceof HashMap
             def status
 
             // Check if the issuance is one we are interested in
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
-                if (issuance.source == assetConfig[counter].issuanceSource && issuance.asset == assetConfig[counter].issuanceAsset && assetConfig[counter].issuanceDependent == true) {
+                if (issuance.sendingaddress == assetConfig[counter].issuanceSource && issuance.asset == assetConfig[counter].issuanceAsset && assetConfig[counter].issuanceDependent == true) {
                     notFound = false
                 }
 
@@ -305,7 +299,7 @@ class CounterpartyFollower {
 
                         db.execute("commit transaction")
                     } catch (Throwable e) {
-                        db.execute("update counterpartyBlocks set status='error', duration=0 where blockId = ${currentBlock}")
+                        db.execute("update mastercoinBlocks set status='error', duration=0 where blockId = ${currentBlock}")
                         log4j.info("Block ${currentBlock}: error")
                         log4j.info("Exception: ${e}")
                         db.execute("rollback transaction")
@@ -323,10 +317,9 @@ class CounterpartyFollower {
         db.execute("begin transaction")
         try {
             for (transaction in transactions) {
-			
                 def String txid = transaction[0]
                 def String inputAddress = transaction[1][0]            // pick the first input address if there is more than 1
-                def String serviceAddress = transaction[8]  // take the service address as the address that was sent to
+                def String serviceAddress = transaction[8]  		   // The address to which asset was sent
                 def Long inAmount = transaction[3]
                 def inAsset = transaction[4]
                 def Long outAmount = transaction[5]
@@ -336,7 +329,7 @@ class CounterpartyFollower {
 				def String outAssetType = transaction[9]
 
                 // int currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, String outAmountValue, int lastModifiedBlockIdValue, int originalAmount
-                // there will only be 1 output for counterparty assets but not the case for native assets - ie change
+                // there will only be 1 output for mastercoin assets but not the case for native assets - ie change
                 // form a payment object which will determine the payment direction and source and destination addresses
                 // public Payment(int currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, Long outAmountValue, int lastModifiedBlockIdValue, Long originalAmount)
                 def payment = new Payment(inAsset, currentBlock, txid, inputAddress, serviceAddress, outAsset, outAssetType, outAmount, currentBlock, inAmount)
@@ -357,14 +350,14 @@ class CounterpartyFollower {
                 log4j.info("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount})")
                 db.execute("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount} )")
                 if (outAmount > 0) {
-                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.COUNTERPARTY_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.COUNTERPARTY_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.MASTERCOIN_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.MASTERCOIN_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
                 }
             }
 
             db.execute("commit transaction")
         } catch (Throwable e) {
-            db.execute("update counterpartyBlocks set status='error', duration=0 where blockId = ${currentBlock}")
+            db.execute("update mastercoinBlocks set status='error', duration=0 where blockId = ${currentBlock}")
             log4j.info("Block ${currentBlock}: error")
             log4j.info("Exception: ${e}")
             db.execute("rollback transaction")
@@ -373,42 +366,46 @@ class CounterpartyFollower {
 
         timeStop = System.currentTimeMillis()
         duration = (timeStop-timeStart)/1000
-        db.execute("update counterpartyBlocks set status='processed', duration=${duration} where blockId = ${currentBlock}")
+        db.execute("update mastercoinBlocks set status='processed', duration=${duration} where blockId = ${currentBlock}")
         log4j.info("Block ${currentBlock}: processed in ${duration}s")
 
     }
 
     public static int main(String[] args) {
-        def counterpartyFollower = new CounterpartyFollower()
+        def mastercoinFollower = new MastercoinFollower()
 
-        counterpartyFollower.init()
-        counterpartyFollower.Audit()
+        mastercoinFollower.init()
+        mastercoinFollower.Audit()
 
-        log4j.info("counterpartyd follower started")
-        log4j.info("Last processed block: " + counterpartyFollower.lastProcessedBlock())
-        log4j.info("Last seen block: " + counterpartyFollower.lastBlock())
+        log4j.info("mastercoind follower started")
+        log4j.info("Last processed block: " + mastercoinFollower.lastProcessedBlock())
+        log4j.info("Last seen block: " + mastercoinFollower.lastBlock())
 
         // Begin following blocks
         while (true) {
             def blockHeight = bitcoinAPI.getBlockHeight()
-            def currentBlock = counterpartyFollower.lastBlock()
-            def currentProcessedBlock = counterpartyFollower.lastProcessedBlock()
+            def currentBlock = mastercoinFollower.lastBlock()
+            def currentProcessedBlock = mastercoinFollower.lastProcessedBlock()
 
             // If the current block is less than the last block we've seen then add it to the blocks db
-            while (counterpartyFollower.lastBlock() < blockHeight) {
+            while (mastercoinFollower.lastBlock() < blockHeight) {
                 currentBlock++
-                counterpartyFollower.processSeenBlock(currentBlock)
+
+                mastercoinFollower.processSeenBlock(currentBlock)
             }
 
             // Check if we can process a block
-            while (counterpartyFollower.lastProcessedBlock() < currentBlock - confirmationsRequired) {
+			// TODO cannot be done using blockId 
+            while (mastercoinFollower.lastProcessedBlock() < currentBlock - confirmationsRequired) {
                 currentProcessedBlock++
 
-                counterpartyFollower.processBlock(currentProcessedBlock)
+                mastercoinFollower.processBlock(currentProcessedBlock)
 
-                currentProcessedBlock = counterpartyFollower.lastProcessedBlock()
+                currentProcessedBlock = mastercoinFollower.lastProcessedBlock()
             }
+
             sleep(sleepIntervalms)
         }
+
     }
 }
