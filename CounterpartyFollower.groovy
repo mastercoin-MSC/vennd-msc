@@ -155,7 +155,6 @@ class CounterpartyFollower {
         timeStart = System.currentTimeMillis()
         sends = counterpartyAPI.getSends(currentBlock)
 		
-		// TODO add outasset type support
         // Process sends
         log4j.info("Block ${currentBlock}: processing " + sends.size() + " sends")
         def transactions = []
@@ -177,7 +176,6 @@ class CounterpartyFollower {
 			def outAssetType = ""
 
             // Check if the send was performed to the central service listen to any of the central asset addresses we are listening on
-			// TODO add here the possibility to convert MSC <--> XCP
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
@@ -205,43 +203,46 @@ class CounterpartyFollower {
 			// REMOVED SUPPORT FOR API ADDRESSES
 
             // Record the send
-			// TODO fix this to handle the case of sending to mastercoin
             if (notFound == false) {
-				txid = send.tx_hash
-                inAmount = send.quantity			                   
+				if (outAssetType == Asset.NATIVE_TYPE
+					txid = send.tx_hash
+					inAmount = send.quantity			                   
 
-                // Calculate fee
-                def amountMinusTX
-                def calculatedFee
+					// Calculate fee	
+					def amountMinusTX
+					def calculatedFee
 
-                // Remove the TX Fee first from calculations
-                amountMinusTX = inAmount - (txFee * satoshi)
+					// Remove the TX Fee first from calculations
+					amountMinusTX = inAmount - (txFee * satoshi)
 
-                // If the amount that was sent was less than the cost of TX then eat the whole amount
-                if (amountMinusTX < 0) {
-                    amountMinusTX = 0
-                }
+					// If the amount that was sent was less than the cost of TX then eat the whole amount
+					if (amountMinusTX < 0) {
+						amountMinusTX = 0
+					}
 
-                if (amountMinusTX > 0) {
-                    calculatedFee = ((amountMinusTX * fee / 100) + (txFee * satoshi)).toInteger()
+					if (amountMinusTX > 0) {
+						calculatedFee = ((amountMinusTX * fee / 100) + (txFee * satoshi)).toInteger()
 
-                    if (inAmount < calculatedFee) {
-                        calculatedFee = inAmount
-                    }
-                }
-                else {
-                    calculatedFee = inAmount
-                }
+						if (inAmount < calculatedFee) {
+							calculatedFee = inAmount
+						}
+					}
+					else {
+						calculatedFee = inAmount
+					}
 
-                // Set out amount if it is more than a satoshi
-                if (inAmount - calculatedFee >= 1) {
-                    outAmount = inAmount - calculatedFee
-                }
-                else {
-                    outAmount = 0
-                }
+					// Set out amount if it is more than a satoshi
+					if (inAmount - calculatedFee >= 1) {
+						outAmount = inAmount - calculatedFee
+					}
+					else {
+						outAmount = 0
+					}
 
-                assert inAmount == outAmount + calculatedFee  // conservation of energy
+					assert inAmount == outAmount + calculatedFee  // conservation of energy
+				} else {	
+					// TODO implement exchange
+				}
 
                 inputAddresses.add(source)
                 outputAddresses.add(destination)

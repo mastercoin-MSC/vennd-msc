@@ -207,7 +207,6 @@ public class VenndNativeFollower {
         }
 
         // Iterate through each raw transaction and get the parsed transaction by calling decoderawtransaction
-		// TODO fix this loop to allow mastercoin support
         def parsedTransactions = []
         for (rawTransaction in rawtransactions) {
             def notCounterwalletSend = false
@@ -377,13 +376,13 @@ public class VenndNativeFollower {
                         db.execute("insert into issuances values (${currentBlock}, ${txid}, ${inputAddress}, ${outAsset}, ${payment.outAmount}, ${outAssetDivisible}, ${payment.issuanceStatus}, ${currentBlock})")
                     }
 
-                    println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})"
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE,  ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})"
+                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
 
                     // process a refund
                     if (payment.refundAmount > 0) {
-                        println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId}) -- refund"
-                        db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                        println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId}) -- refund"
+                        db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
                     }
                 }
             }

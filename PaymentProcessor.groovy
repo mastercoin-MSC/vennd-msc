@@ -13,7 +13,6 @@ class PaymentProcessor {
 	static mastercoinAPI
     static bitcoinAPI
     static boolean testMode
-//    static String listenerBitcoinAddress
     static String walletPassphrase
     static int sleepIntervalms
     static String databaseName
@@ -23,7 +22,6 @@ class PaymentProcessor {
 
     static logger
     static log4j
-//    static groovyx.net.http.AsyncHTTPBuilder HttpAsync
     static db
 
 
@@ -73,7 +71,6 @@ class PaymentProcessor {
         sleepIntervalms = iniConfig.sleepIntervalms
         databaseName = iniConfig.database.name
         counterpartyTransactionEncoding = iniConfig.counterpartyTransactionEncoding
-		mastercointTransactionEncoding = iniConfig.mastercoinTransactionEncoding // TODO create property
         walletUnlockSeconds = iniConfig.walletUnlockSeconds
 
         // Init database
@@ -86,10 +83,6 @@ class PaymentProcessor {
     public audit() {
 
     }
-
-	public payWithCounterParty() { 
-		return true
-	}
 
     public getLastPaymentBlock() {
         def Long result
@@ -220,7 +213,6 @@ class PaymentProcessor {
 
         // send transaction
         try {
-			// TODO check how to match counterparty API asset id and addresses... 
             counterpartyAPI.broadcastSignedTransaction(counterparty_signedTransaction)
 			mastercoinAPI.sendDividend(mastercoin_sourceAddress, quantity_per_share_dividend * mastercoin_numberOfTokenIssued, asset, dividend_asset) // TODO check
             log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
@@ -242,8 +234,7 @@ class PaymentProcessor {
 //        return unsignedTransaction
 
     }
-
-
+	
 	public pay(Long currentBlock, Payment payment,Long dividend_percent) {
 		
         def sourceAddress = payment.sourceAddress
@@ -268,7 +259,7 @@ class PaymentProcessor {
         bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
         bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 
-		if (payWithCounterParty()) {
+		if (payment.outAssetType == Asset.COUNTERPARTY_TYPE) {
 			// Create the (unsigned) counterparty send transaction
 			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode)
 			assert unsignedTransaction instanceof java.lang.String
@@ -352,20 +343,26 @@ class PaymentProcessor {
 //            }
             if (payment != null) {
                 if (payment.inAssetType == Asset.NATIVE_TYPE){
-					// This is an issuing transaction, we need to pay dividend
-					log4j.info("payment.outAsset ${payment.outAsset}")
-					paymentProcessor.pay_dividend(blockHeight, payment,dividend_percent)
-					paymentProcessor.pay(blockHeight, payment,dividend_percent)
+					if (payment.outAssetType != Asset.NATIVE_TYPE){
+						// This is an issuing transaction, we need to pay dividend
+						log4j.info("payment.outAsset ${payment.outAsset}")
+						paymentProcessor.pay_dividend(blockHeight, payment,dividend_percent)
+						paymentProcessor.pay(blockHeight, payment,dividend_percent)
+					} else {
+						// This is a refund transaction... 
+						// TODO 
+					}					
 				} else if (payment.outAssetType == Asset.NATIVE_TYPE) {
 					// This is a sell transaction... 
 					paymentProcessor.pay(blockHeight, payment,0)
 					log4j.info("--------------BURN-------------")
 				} else if ((payment.inAssetType == Asset.MASTERCOIN_TYPE && payment.outAssetType == Asset.COUNTERPARTY_TYPE ) || 
 					(payment.inAssetType == Asset.COUNTERPARTY_TYPE && payment.outAssetType == Asset.MASTERCOIN_TYPE)) {
-					// This is an exchange transaction
+					// TODO This is an exchange transaction
+					paymentProcessor.pay(blockHeight, payment,0)
 					
 					log4j.info("----------------- EXCHANGE TRANSACTION -----------------")
-				} else {
+				} else {				
 					log4j.info("----------------- UNKOWN TRANSACTION TYPE -----------------")
 				}
 				

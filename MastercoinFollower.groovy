@@ -157,7 +157,6 @@ class MastercoinFollower {
         def transactions = []
         for (send in sends) {
             //assert send instanceof HashMap
-			// TODO add outasset type support
             def inputAddresses = []
             def outputAddresses = []
             def inAsset = ""
@@ -173,7 +172,6 @@ class MastercoinFollower {
 			def outAssetType = ""
 
             // Check if the send was performed to the central service listen to any of the central asset addresses we are listening on
-			// TODO add here the possibility to convert MSC <--> XCP
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
@@ -199,117 +197,51 @@ class MastercoinFollower {
             }
 
             // Record the send
-			// TODO fix this to handle the case of sending to counterparty
             if (notFound == false) {
-				txid = send.txid    
-				inAmount = send.amount				
+				if (outAssetType == Asset.NATIVE_TYPE
+					txid = send.tx_hash
+					inAmount = send.quantity			                   
 
-                // Calculate fee
-                def amountMinusTX
-                def calculatedFee
+					// Calculate fee	
+					def amountMinusTX
+					def calculatedFee
 
-                // Remove the TX Fee first from calculations
-                amountMinusTX = inAmount - (txFee * satoshi)
+					// Remove the TX Fee first from calculations
+					amountMinusTX = inAmount - (txFee * satoshi)
 
-                // If the amount that was sent was less than the cost of TX then eat the whole amount
-                if (amountMinusTX < 0) {
-                    amountMinusTX = 0
-                }
+					// If the amount that was sent was less than the cost of TX then eat the whole amount
+					if (amountMinusTX < 0) {
+						amountMinusTX = 0
+					}
 
-                if (amountMinusTX > 0) {
-                    calculatedFee = ((amountMinusTX * fee / 100) + (txFee * satoshi)).toInteger()
+					if (amountMinusTX > 0) {
+						calculatedFee = ((amountMinusTX * fee / 100) + (txFee * satoshi)).toInteger()
 
-                    if (inAmount < calculatedFee) {
-                        calculatedFee = inAmount
-                    }
-                }
-                else {
-                    calculatedFee = inAmount
-                }
+						if (inAmount < calculatedFee) {
+							calculatedFee = inAmount
+						}
+					}
+					else {
+						calculatedFee = inAmount
+					}
 
-                // Set out amount if it is more than a satoshi
-                if (inAmount - calculatedFee >= 1) {
-                    outAmount = inAmount - calculatedFee
-                }
-                else {
-                    outAmount = 0
-                }
+					// Set out amount if it is more than a satoshi
+					if (inAmount - calculatedFee >= 1) {
+						outAmount = inAmount - calculatedFee
+					}
+					else {
+						outAmount = 0
+					}
 
-                assert inAmount == outAmount + calculatedFee  // conservation of energy
-
+					assert inAmount == outAmount + calculatedFee  // conservation of energy
+				} else {	
+					// TODO implement exchange
+				}
                 inputAddresses.add(source)
                 outputAddresses.add(destination)
 
                 transactions.add([txid, inputAddresses, outputAddresses, inAmount, inAsset, outAmount, outAsset, calculatedFee, serviceAddress,outAssetType])
                 log4j.info("Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${serviceAddress} (${outAssetType}) ${inAmount/satoshi} ${inAsset} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${inAsset} fee collected)")
-            }
-        }
-
-
-		// For now - we ignore this...
-		// TODO there is no issuance - they are usual sends        
-		// Process issuances
-        log4j.info("Block ${currentBlock}: processing " + sends.size() + " issuances")
-        for (issuance in []) {
-            // assert issuance instanceof HashMap
-            def status
-
-            // Check if the issuance is one we are interested in
-            def notFound = true
-            def counter = 0
-            while (notFound && counter <= assetConfig.size()-1) {
-                if (issuance.sendingaddress == assetConfig[counter].issuanceSource && issuance.asset == assetConfig[counter].issuanceAsset && assetConfig[counter].issuanceDependent == true) {
-                    notFound = false
-                }
-
-                counter++
-            }
-
-            if (notFound == false) {
-                def asset = issuance.asset
-                def quantity = issuance.quantity
-                def source = issuance.source
-                def divisible = issuance.divisible
-                def description = issuance.description
-                def destinationAddress
-                def matchingPayment
-                def rowId
-
-                assert issuance.locked != 1
-
-                // now match this issuance amount to the first payment that precisely matches this asset and description
-                matchingPayment = db.firstRow("select rowid,* from payments where outAsset = ${asset} and outAmount = ${quantity} and status = 'waitIssuance' order by rowid asc")
-
-                if (matchingPayment != null && matchingPayment[0] != null) {
-                    status = 'complete'
-                    destinationAddress = matchingPayment.destinationAddress
-                    rowId = matchingPayment.rowid
-                }
-                else {
-                    status = 'completedNoMatch'
-                    destinationAddress = ''
-                    rowId = 0
-                }
-
-                if (status == 'complete') {
-                    db.execute("begin transaction")
-                    try {
-                        log4j.info("update payments set status='authorized', lastUpdatedBlockId=${currentBlock} where rowid = ${rowId} and destinationAddress=${destinationAddress} and outAsset=${asset} and outAmount=${quantity} and status='waitIssuance'")
-                        db.execute("update payments set status='authorized', lastUpdatedBlockId=${currentBlock} where rowid = ${rowId} and destinationAddress=${destinationAddress} and outAsset=${asset} and outAmount=${quantity} and status='waitIssuance'")
-
-                        db.execute("commit transaction")
-                    } catch (Throwable e) {
-                        db.execute("update mastercoinBlocks set status='error', duration=0 where blockId = ${currentBlock}")
-                        log4j.info("Block ${currentBlock}: error")
-                        log4j.info("Exception: ${e}")
-                        db.execute("rollback transaction")
-                        assert e == null
-                    }
-                }
-
-//                issuanceTransactions.add([asset, quantity, source, destinationAddress, divisible, description, status])
-
-                log4j.info("Block ${currentBlock} found issuance : ${currentBlock} ${source} ${quantity} ${asset} divisibility=${divisible}, description=${description}, for destinationAddress=${destinationAddress}, status=${status}")
             }
         }
 
@@ -395,7 +327,6 @@ class MastercoinFollower {
             }
 
             // Check if we can process a block
-			// TODO cannot be done using blockId 
             while (mastercoinFollower.lastProcessedBlock() < currentBlock - confirmationsRequired) {
                 currentProcessedBlock++
 
