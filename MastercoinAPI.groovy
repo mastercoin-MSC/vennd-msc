@@ -59,8 +59,7 @@ class MastercoinAPI {
         while ( ! result.done ) {
             Thread.sleep(100)
         }
-
-        println result
+			
         return result.get()
 	}
 
@@ -83,10 +82,12 @@ class MastercoinAPI {
 		return null
 	}
 
+	// TODO this is not used in our app
     public broadcastSignedTransaction(String signedTransaction) {
 		return sendRPCMessage('sendrawtransaction', [signedTransaction])
 	}
  
+	// TODO this is not used in our app
     public signTransaction(String unsignedTransaction) {
 		return sendRPCMessage('signrawtransaction', [unsignedTransaction])
 	}
