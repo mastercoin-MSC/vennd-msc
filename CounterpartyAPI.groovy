@@ -43,23 +43,22 @@ class CounterpartyAPI {
                     params : in_params,
                     jsonrpc : "2.0"
             ]
-
-            paramsJSON = new groovy.json.JsonBuilder(body)
+		
+		paramsJSON = new groovy.json.JsonBuilder(body)
  	    log4j.info(command + " payload: " + paramsJSON)
 
-            response.success = { resp, json ->
-                if (json.containsKey("error")) {
-                    log4j.info(command + " error: " + json.error)
-                    return json.error
-                }
-				
-
-                return json.result
+        response.success = { resp, json ->
+            if (json.containsKey("error")) {
+                log4j.info(command + " error: " + json.error)
+                return json.error
             }
+				
+            return json.result
+        }
 	    
  	    response.failure { resp -> 
-		log4j.info(command + " failed") 
-		assert resp.responesBase == null
+			log4j.info(command + " failed") 
+			assert resp.responesBase == null
 	    }
 
 		
@@ -70,8 +69,7 @@ class CounterpartyAPI {
             Thread.sleep(100)
         }
 
-        println result
-        return result.get()
+       return result.get()
 	}
 
 
@@ -135,22 +133,21 @@ class CounterpartyAPI {
     }
 
     public broadcastSignedTransaction(String signedTransaction) {
-	def result = sendRPCMessage('broadcast_tx', [signedTransaction])
-	if (result == null) { 
-		log4j.info("broadcast faild - null was returned")
-		assert result != null
-	}
-	return result
+		def result = sendRPCMessage('broadcast_tx', [signedTransaction])
+		if (result == null) { 
+			log4j.info("broadcast_tx failed - null was returned")
+			assert result != null
+		}
+		return result
     }
 
     public signTransaction(String unsignedTransaction) {
-	def result = sendRPCMessage('sign_tx', [unsignedTransaction])
-	if (result == null) { 
-		log4j.info("broadcast faild - null was returned")
-		assert result != null
-	}
-	return result
-
+		def result = sendRPCMessage('sign_tx', [unsignedTransaction])
+		if (result == null) { 
+			log4j.info("signTransaction failed - null was returned")
+			assert result != null
+		}
+		return result
     }
 
     public createSend(sourceAddress, destinationAddress, asset, amount, testMode) {
@@ -167,31 +164,31 @@ class CounterpartyAPI {
         }
 
 	
-	def result = sendRPCMessage('create_send', myParams)
-
-	if (result == null) { 
-		log4j.info("broadcast faild - null was returned")
-		assert result != null
-	}
-	return result
-
-		
-
+		def result = sendRPCMessage('create_send', myParams)
+		if (result == null) { 
+			log4j.info("create_send failed - null was returned")
+			assert result != null
+		}
+		return result
 	}
 
     public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value) {
-	def result = sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
-	if (result == null) { 
-		log4j.info("broadcast faild - null was returned")
-		assert result != null
-	}
-	return result
-
+		def result = sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
+		if (result == null) { 
+			log4j.info("create_broadcast failed - null was returned")
+			assert result != null
+		}
+		return result
     }
 
 //    create_issuance(source, asset, quantity, divisible, description
     public createIssuance(sourceAddress, asset, quantity, divisible, description) {
-        return sendRPCMessage('create_issuance',[sourceAddress, asset, quantity, divisible, description])
+        def result = sendRPCMessage('create_issuance',[sourceAddress, asset, quantity, divisible, description])
+		if (result == null) { 
+			log4j.info("create_issuance failed - null was returned")
+			assert result != null
+		}
+		return result
 	}
 
 	//    create_dividend(source, quantity_per_unit, asset, dividend_asset, encoding='multisig', pubkey=null)
@@ -199,7 +196,12 @@ class CounterpartyAPI {
 	    def myParams
         myParams = [source:sourceAddress, quantity_per_unit:quantity_per_share,asset:asset,dividend_asset:dividend_asset ,encoding:counterpartyTransactionEncoding,multisig_dust_size:counterpartyMultisendPerBlock,op_return_value:null]
 		//  myParams = [source: sourceAddress,destination: destinationAddress,asset: asset,quantity: amount, encoding:counterpartyTransactionEncoding, pubkey:null, multisig_dust_size:counterpartyMultisendPerBlock, op_return_value:null]
-		return sendRPCMessage('create_dividend', myParams)
+		def result = sendRPCMessage('create_dividend', myParams)
+		if (result == null) { 
+			log4j.info("create_dividend failed - null was returned")
+			assert result != null
+		}
+		return result
 	}
 	
     //get_asset_info(assets)
