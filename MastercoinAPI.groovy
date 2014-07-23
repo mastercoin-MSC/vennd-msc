@@ -51,10 +51,6 @@ class MastercoinAPI {
                     return json.error
                 }
 				
-				if (json.result == null) {
-				    log4j.info(command + " failed - null was returned")
-				}
-
                 return json.result
             }
         }
@@ -77,7 +73,9 @@ class MastercoinAPI {
 	}
 
     public getSends(Long blockId) {
-		return sendRPCMessage('listblocktransactions_MP', [blockId,blockId])
+//		return sendRPCMessage('listblocktransactions_MP', [blockId,blockId])
+		return sendRPCMessage('listtransactions_MP', ["*", 10000, 0, blockId,blockId])
+
 	}
 
 	// TODO cannot be done using mastercore 

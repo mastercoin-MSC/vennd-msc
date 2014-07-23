@@ -153,6 +153,8 @@ class MastercoinFollower {
         timeStart = System.currentTimeMillis()
         sends = mastercoinAPI.getSends(currentBlock)
 
+	if (sends == null) sends = []
+
         // Process sends
         log4j.info("Block ${currentBlock}: processing " + sends.size() + " sends")
         def transactions = []

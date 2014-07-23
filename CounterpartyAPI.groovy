@@ -45,7 +45,7 @@ class CounterpartyAPI {
             ]
 
             paramsJSON = new groovy.json.JsonBuilder(body)
-			log4j.info(command + " payload: " + paramsJSON)
+ 	    log4j.info(command + " payload: " + paramsJSON)
 
             response.success = { resp, json ->
                 if (json.containsKey("error")) {
@@ -53,12 +53,16 @@ class CounterpartyAPI {
                     return json.error
                 }
 				
-				if (json.result == null) {
-				    log4j.info(command + " failed - null was returned")
-				}
 
                 return json.result
             }
+	    
+ 	    response.failure { resp -> 
+		log4j.info(command + " failed") 
+		assert resp.responesBase == null
+	    }
+
+		
         }
 
         assert result instanceof java.util.concurrent.Future
@@ -131,11 +135,22 @@ class CounterpartyAPI {
     }
 
     public broadcastSignedTransaction(String signedTransaction) {
-		return sendRPCMessage('broadcast_tx', [signedTransaction])
+	def result = sendRPCMessage('broadcast_tx', [signedTransaction])
+	if (result == null) { 
+		log4j.info("broadcast faild - null was returned")
+		assert result != null
+	}
+	return result
     }
 
     public signTransaction(String unsignedTransaction) {
-		return sendRPCMessage('sign_tx', [unsignedTransaction])
+	def result = sendRPCMessage('sign_tx', [unsignedTransaction])
+	if (result == null) { 
+		log4j.info("broadcast faild - null was returned")
+		assert result != null
+	}
+	return result
+
     }
 
     public createSend(sourceAddress, destinationAddress, asset, amount, testMode) {
@@ -150,12 +165,28 @@ class CounterpartyAPI {
         else {
             myParams = ["source":'12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7',"destination":'142UYTzD1PLBcSsww7JxKLck871zRYG5D3',"asset":asset,"quantity":20000]  // in test mode send only just enough for dust
         }
+
+	
+	def result = sendRPCMessage('create_send', myParams)
+
+	if (result == null) { 
+		log4j.info("broadcast faild - null was returned")
+		assert result != null
+	}
+	return result
+
 		
-		return sendRPCMessage('create_send', myParams)
+
 	}
 
     public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value) {
-		return sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
+	def result = sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
+	if (result == null) { 
+		log4j.info("broadcast faild - null was returned")
+		assert result != null
+	}
+	return result
+
     }
 
 //    create_issuance(source, asset, quantity, divisible, description
@@ -173,7 +204,7 @@ class CounterpartyAPI {
 	
     //get_asset_info(assets)
     public getAssetInfo(asset) {
-		sendRPCMessage('get_asset_info', [ [asset] ,])
+		return sendRPCMessage('get_asset_info', [ [asset] ,])
 	}
  
 	// TODO this is not in the API. Why was it written???
