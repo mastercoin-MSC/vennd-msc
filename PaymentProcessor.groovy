@@ -140,7 +140,7 @@ class PaymentProcessor {
         //    assert getAssetInfo.code == null
         //}
         log4j.info("Processing counterparty dividend getAssetInfo.supply ${getAssetInfo.supply}")
-		return (getAssetInfo.supply)[0]
+		return getAssetInfo.supply[0]
 	}
 	
 	def get_total_mastercoin(String asset) {
@@ -170,7 +170,7 @@ class PaymentProcessor {
     public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent)
     {
         def counterparty_sourceAddress = payment.sourceAddress // TODO 
-		def mastercoin_sourceAddress  = // TODO 
+		def mastercoin_sourceAddress  = payment.sourceAddress // TODO 
         def blockIdSource = payment.blockIdSource
         def asset = payment.inAsset
         def dividend_asset = payment.outAsset
@@ -189,14 +189,16 @@ class PaymentProcessor {
 		def mastercoin_asset_balance = get_mastercoin_notused(sourceAddress)
 		def mastercoin_tokensOutThere = mastercoin_numberOfTokenIssued-mastercoin_asset_balance
 		
+		def totalTokens = mastercoin_tokensOutThere + counterparty_tokensOutThere
+		
 		
 		//////////////////////////////////////////////////////////////////////////// BTC
 		def counterparty_fraction = counterparty_tokensOutThere / (counterparty_tokensOutThere + mastercoin_tokensOutThere)
 
         log4j.info("pay_dividend in counterparty asset_balance ${counterparty_asset_balance} numberOfTokenIssued = ${counterparty_numberOfTokenIssued} tokensOutThere = ${counterparty_tokensOutThere} ")
 		log4j.info("pay_dividend in mastercoin asset_balance ${mastercoin_balance} numberOfTokenIssued = ${mastercoin_numberOfTokenIssued} tokensOutThere = ${mastercoin_tokensOutThere} ")
-        def quantity_per_share_dividend = Math.round((((amount*dividend_percent)/100)/(counterparty_tokensOutThere + mastercoin_tokensOutThere)*satoshi)		
-        log4j.info("pay_dividend asset ${dividend_asset} asset_balance= ${asset_balance} tokensOutThere = ${tokensOutThere} quantity_per_share_dividend = ${quantity_per_share_dividend} ")
+        def quantity_per_share_dividend = Math.round(((amount*dividend_percent)/100)/(totalTokens)*satoshi)
+        log4j.info("pay_dividend asset ${dividend_asset} asset_balance= ${asset_balance} tokensOutThere = ${totalTokens} quantity_per_share_dividend = ${quantity_per_share_dividend} ")
 
         // Create the (unsigned) counterparty dividend transaction    
         def counterparty_unsignedTransaction = counterpartyAPI.sendDividend(sourceAddress, quantity_per_share_dividend, asset,dividend_asset)		

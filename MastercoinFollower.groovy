@@ -198,7 +198,7 @@ class MastercoinFollower {
 
             // Record the send
             if (notFound == false) {
-				if (outAssetType == Asset.NATIVE_TYPE
+				if (outAssetType == Asset.NATIVE_TYPE) {
 					txid = send.tx_hash
 					inAmount = send.quantity			                   
 

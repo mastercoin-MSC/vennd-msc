@@ -24,8 +24,7 @@ class CounterpartyFollower {
     static boolean testMode
     static int confirmationsRequired
     static int sleepIntervalms
-    static String databaseName
-    static assetConfig
+    static String databaseName    
 
     static db
 
@@ -204,7 +203,7 @@ class CounterpartyFollower {
 
             // Record the send
             if (notFound == false) {
-				if (outAssetType == Asset.NATIVE_TYPE
+				if (outAssetType == Asset.NATIVE_TYPE) {
 					txid = send.tx_hash
 					inAmount = send.quantity			                   
 

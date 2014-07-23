@@ -114,7 +114,7 @@ public class VenndNativeFollower {
         feeAmountPercentage = iniConfig.feeAmountPercentage
         testMode = iniConfig.testMode
         sleepIntervalms = iniConfig.sleepIntervalms
-        databaseName = iniConfig.database.name
+        databaseName = iniConfig.databasename
         confirmationsRequired = iniConfig.confirmationsRequired
         outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
         outAssetMultiplier = iniConfig.outAssetMultiplier
@@ -240,13 +240,13 @@ public class VenndNativeFollower {
             def found = false
 			def outAsset = ""
 			for (assetRec in assetConfig) {
-				if (outputAddresses.contains(assetRec.nativeAddressMastercoin)) 
+				if (outputAddresses.contains(assetRec.nativeAddressMastercoin)) {
 					serviceAddress = assetRec.nativeAddressMastercoin
 					found = true
 					asset = assetRec
 					type = Asset.MASTERCOIN_TYPE
 					outAsset = asset.mastercoinAssetName 
-				} else if (outputAddresses.contains(assetRec.nativeAddressCounterparty) { 
+				} else if (outputAddresses.contains(assetRec.nativeAddressCounterparty)) { 
 					serviceAddress = assetRec.nativeAddressCounterparty
 					found = true
 					asset = assetRec
@@ -324,7 +324,7 @@ public class VenndNativeFollower {
                 // Only record if one of the input addresses is NOT the service address. ie we didn't initiate the send
                 // if (inputAddresses.contains(listenerAddress) == false) {
                 parsedTransactions.add([txid, inputAddresses, outputAddresses, inAmount, asset.nativAssetName, outAmount, outAsset, calculatedFee, serviceAddress, type, notCounterwalletSend])
-                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${inAsset} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${inAsset} fee collected)"
+                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${asset.nativAssetName} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${asset.nativAssetName} fee collected)"
                 //}
             }
 

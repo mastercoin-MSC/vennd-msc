@@ -27,7 +27,7 @@ public class Asset {
     def issuanceDivisible
     def issuanceDescription
 
-    public Asset(String counterpartyAssetNameValue, String mastercoinAssetName, String nativeAssetNameValue, String counterpartyAddressValue, String mastercoinAddressValue, String nativeAddressCounterpartyValue, String nativeAddressMastercoinValue, String counterpartyToMastercoinAddressValue, String mastercoinToCounterpartyAddressValue,BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue, boolean issuanceDependentValue, String issuanceSourceValue, String issuanceAssetValue, boolean issuanceDivisibleValue, String issuanceDescriptionValue) {
+    public Asset(String counterpartyAssetNameValue, String mastercoinAssetNameValue, String nativeAssetNameValue, String counterpartyAddressValue, String mastercoinAddressValue, String nativeAddressCounterpartyValue, String nativeAddressMastercoinValue, String counterpartyToMastercoinAddressValue, String mastercoinToCounterpartyAddressValue,BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue, boolean issuanceDependentValue, String issuanceSourceValue, String issuanceAssetValue, boolean issuanceDivisibleValue, String issuanceDescriptionValue) {
        
 	    counterpartyAssetName = counterpartyAssetNameValue
 		mastercoinAssetName  = mastercoinAssetNameValue
@@ -38,9 +38,8 @@ public class Asset {
 		nativeAddressCounterparty = nativeAddressCounterpartyValue
 		nativeAddressMastercoin = nativeAddressMastercoinValue
 		counterpartyToMastercoinAddress = counterpartyToMastercoinAddressValue
-		mastercoinToCounterpartyAddress = mastercoinToCounterpartyAddressValue
-		
-        nativeAddress = nativeAddressValue
+		mastercoinToCounterpartyAddress = mastercoinToCounterpartyAddressValue	       
+		        
         txFee = txFeeValue
         feePercentage = feePercentageValue
         mappingRequired = mappingRequiredValue
@@ -52,9 +51,9 @@ public class Asset {
     }
 	
 	public static readAssets(String file) {
-		iniConfig = new ConfigSlurper().parse(new File(file).toURL())
+		def iniConfig = new ConfigSlurper().parse(new File(file).toURL())
 		
-		assetConfig = []
+		def assetConfig = []
         iniConfig.asset.each { it ->
             def issuanceDependent
             def issuanceSource
@@ -72,6 +71,6 @@ public class Asset {
             assetConfig.add(currentAsset)
         }
 		
-		return assetConfog
+		return assetConfig
 	}
 }

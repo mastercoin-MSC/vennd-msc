@@ -8,7 +8,7 @@ import groovyx.net.http.AsyncHTTPBuilder
 import static groovyx.net.http.ContentType.*
 import static groovyx.net.http.Method.*
 
-class mastercoinAPI {
+class MastercoinAPI {
     private String mastercoinTransactionEncoding
     private String mastercoinRpcURL
     private String mastercoinRpcUser
@@ -131,7 +131,7 @@ class mastercoinAPI {
 		return null
     }
 
-    public mastercoinAPI(logger) {
+    public MastercoinAPI(logger) {
         init()
 		log4j = logger
     }
