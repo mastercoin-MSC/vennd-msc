@@ -25,6 +25,8 @@ class MastercoinFollower {
     static int confirmationsRequired
     static int sleepIntervalms
     static String databaseName
+
+    static db
 	
     public class Payment {
         def String inAsset
@@ -85,7 +87,6 @@ class MastercoinFollower {
 		assetConfig = Asset.readAssets("AssetInformation.ini")
 
         // init database
-        def row
         db = Sql.newInstance("jdbc:sqlite:${databaseName}", "org.sqlite.JDBC")
         db.execute("PRAGMA busy_timeout = 1000")
 		DBCreator.createDB(db)
@@ -179,7 +180,7 @@ class MastercoinFollower {
                     notFound = false
                     inAsset = assetConfig[counter].mastercoinAssetName
                     outAsset = assetConfig[counter].nativeAssetName
-					outAssetType = Asset.NATIVE_TYPE
+		    outAssetType = Asset.NATIVE_TYPE
                     fee = assetConfig[counter].feePercentage
                     txFee = assetConfig[counter].txFee
                     serviceAddress = assetConfig[counter].mastercoinAddress
@@ -196,6 +197,9 @@ class MastercoinFollower {
                 counter++
             }
 
+
+	    def calculatedFee
+
             // Record the send
             if (notFound == false) {
 				if (outAssetType == Asset.NATIVE_TYPE) {
@@ -204,7 +208,6 @@ class MastercoinFollower {
 
 					// Calculate fee	
 					def amountMinusTX
-					def calculatedFee
 
 					// Remove the TX Fee first from calculations
 					amountMinusTX = inAmount - (txFee * satoshi)
@@ -282,8 +285,8 @@ class MastercoinFollower {
                 log4j.info("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount})")
                 db.execute("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount} )")
                 if (outAmount > 0) {
-                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.MASTERCOIN_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.MASTERCOIN_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.MASTERCOIN_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.MASTERCOIN_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
                 }
             }
 

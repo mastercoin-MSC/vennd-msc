@@ -3,29 +3,29 @@
  */
 
 public class Asset {
-	static String MASTERCOIN_TYPE = "MSC"
-	static String COUNTERPARTY_TYPE = "XCP"
-	static String NATIVE_TYPE = "BTC"
+	public static String MASTERCOIN_TYPE = "MSC"
+	public static String COUNTERPARTY_TYPE = "XCP"
+	public static String NATIVE_TYPE = "BTC"
 
-    def String counterpartyAssetName
-	def String mastercoinAssetName
-    def String nativeAssetName
+    public String counterpartyAssetName
+	public String mastercoinAssetName
+    public String nativeAssetName
 	
-    def String counterpartyAddress // the counterparty/bitcoin address side where we will receive the Counterparty asset
-	def String mastercoinAddress // the mastercoin/bitcoin address side where we will receive the mastercoin asset
-    def String nativeAddressCounterparty // The address which users should send their native asset to get counterparty
-	def String nativeAddressMastercoin // The address which users should send their native asset to get mastercoin
-	def String counterpartyToMastercoinAddress // The address for a counterparty -> mastercoin conversion
-	def String mastercoinToCounterpartyAddress // The address for a mastercoin -> counterparty conversion
+    public String counterpartyAddress // the counterparty/bitcoin address side where we will receive the Counterparty asset
+	public String mastercoinAddress // the mastercoin/bitcoin address side where we will receive the mastercoin asset
+    public String nativeAddressCounterparty // The address which users should send their native asset to get counterparty
+	public String nativeAddressMastercoin // The address which users should send their native asset to get mastercoin
+	public String counterpartyToMastercoinAddress // The address for a counterparty -> mastercoin conversion
+	public String mastercoinToCounterpartyAddress // The address for a mastercoin -> counterparty conversion
 
-    def BigDecimal txFee
-    def BigDecimal feePercentage
-    def boolean mappingRequired
-    def issuanceDependent
-    def issuanceSource
-    def issuanceAsset
-    def issuanceDivisible
-    def issuanceDescription
+    public BigDecimal txFee
+    public BigDecimal feePercentage
+    public boolean mappingRequired
+    public issuanceDependent
+    public issuanceSource
+    public issuanceAsset
+    public issuanceDivisible
+    public issuanceDescription
 
     public Asset(String counterpartyAssetNameValue, String mastercoinAssetNameValue, String nativeAssetNameValue, String counterpartyAddressValue, String mastercoinAddressValue, String nativeAddressCounterpartyValue, String nativeAddressMastercoinValue, String counterpartyToMastercoinAddressValue, String mastercoinToCounterpartyAddressValue,BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue, boolean issuanceDependentValue, String issuanceSourceValue, String issuanceAssetValue, boolean issuanceDivisibleValue, String issuanceDescriptionValue) {
        

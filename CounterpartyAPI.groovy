@@ -45,7 +45,7 @@ class CounterpartyAPI {
             ]
 
             paramsJSON = new groovy.json.JsonBuilder(body)
-			log4j.info(command + " payload: " + payloadJSON)
+			log4j.info(command + " payload: " + paramsJSON)
 
             response.success = { resp, json ->
                 if (json.containsKey("error")) {

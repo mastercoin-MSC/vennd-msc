@@ -202,6 +202,8 @@ class CounterpartyFollower {
 			// REMOVED SUPPORT FOR API ADDRESSES
 
             // Record the send
+
+   	    def calculatedFee = 0
             if (notFound == false) {
 				if (outAssetType == Asset.NATIVE_TYPE) {
 					txid = send.tx_hash
@@ -209,7 +211,6 @@ class CounterpartyFollower {
 
 					// Calculate fee	
 					def amountMinusTX
-					def calculatedFee
 
 					// Remove the TX Fee first from calculations
 					amountMinusTX = inAmount - (txFee * satoshi)
@@ -357,8 +358,8 @@ class CounterpartyFollower {
                 log4j.info("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount})")
                 db.execute("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount} )")
                 if (outAmount > 0) {
-                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.COUNTERPARTY_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.COUNTERPARTY_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.COUNTERPARTY_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.COUNTERPARTY_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
                 }
             }
 

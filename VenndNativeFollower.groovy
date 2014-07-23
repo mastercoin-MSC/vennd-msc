@@ -35,7 +35,7 @@ public class VenndNativeFollower {
         def String sourceAddress
         def String destinationAddress
         def String outAsset
-		def String outAssetType
+	def String outAssetType
         def Long outAmount
         def Long lastModifiedBlockId
         def String status
@@ -47,6 +47,9 @@ public class VenndNativeFollower {
             inAsset = inAssetValue
             outAsset = outAssetValue
 			outAssetType = outAssetTypeValue
+		
+	    sourceAddress = sourceAddressValue
+	    destinationAddress = destinationAddressValue
 			
             outAmount = outAmountValue * outAssetMultiplier
             // Treat indivisible asset differently as they aren't multiplied by the satoshi factor
@@ -114,7 +117,7 @@ public class VenndNativeFollower {
         feeAmountPercentage = iniConfig.feeAmountPercentage
         testMode = iniConfig.testMode
         sleepIntervalms = iniConfig.sleepIntervalms
-        databaseName = iniConfig.databasename
+        databaseName = iniConfig.database.name
         confirmationsRequired = iniConfig.confirmationsRequired
         outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
         outAssetMultiplier = iniConfig.outAssetMultiplier
@@ -323,8 +326,8 @@ public class VenndNativeFollower {
 
                 // Only record if one of the input addresses is NOT the service address. ie we didn't initiate the send
                 // if (inputAddresses.contains(listenerAddress) == false) {
-                parsedTransactions.add([txid, inputAddresses, outputAddresses, inAmount, asset.nativAssetName, outAmount, outAsset, calculatedFee, serviceAddress, type, notCounterwalletSend])
-                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${asset.nativAssetName} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${asset.nativAssetName} fee collected)"
+                parsedTransactions.add([txid, inputAddresses, outputAddresses, inAmount, asset.nativeAssetName, outAmount, outAsset, calculatedFee, serviceAddress, type, notCounterwalletSend])
+                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${asset.nativeAssetName} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${asset.nativeAssetName} fee collected)"
                 //}
             }
 
@@ -376,13 +379,13 @@ public class VenndNativeFollower {
                         db.execute("insert into issuances values (${currentBlock}, ${txid}, ${inputAddress}, ${outAsset}, ${payment.outAmount}, ${outAssetDivisible}, ${payment.issuanceStatus}, ${currentBlock})")
                     }
 
-                    println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE,  ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})"
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                    println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE},  ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})"
+                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
 
                     // process a refund
                     if (payment.refundAmount > 0) {
-                        println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId}) -- refund"
-                        db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, Asset.NATIVE_TYPE, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
+                        println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId}) -- refund"
+                        db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
                     }
                 }
             }

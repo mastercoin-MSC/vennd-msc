@@ -50,8 +50,6 @@ public class DBCreator {
         assert row != null
         row = db.firstRow("select name from sqlite_master where type='table' and name='counterpartyBlocks'")
         assert row != null
-        row = db.firstRow("select name from sqlite_master where type='table' and name='addressMaps'")
-        assert row != null
 		row = db.firstRow("select name from sqlite_master where type='table' and name='mastercoinBlocks'")
         assert row != null
 	}
