@@ -31,13 +31,13 @@ class PaymentProcessor {
         def sourceAddress
         def destinationAddress
         def outAsset
-		def outAssetType
-        def outAmount
+		def outAssetType        
         def status
         def lastUpdatedBlockId
 		def inAssetType
+		def inAmount
 
-        public Payment(blockIsSourceValue, txidValue, sourceAddressValue, inAssetTypeValue, destinationAddressValue, outAssetValue, outAssetTypeValue, outAmountValue, statusValue, lastUpdatedBlockIdValue) {
+        public Payment(blockIsSourceValue, txidValue, sourceAddressValue, inAssetTypeValue, inAmount, destinationAddressValue, outAssetValue, outAssetTypeValue, outAmountValue, statusValue, lastUpdatedBlockIdValue) {
             blockIdSource = blockIsSourceValue
             txid = txidValue
             sourceAddress = sourceAddressValue
@@ -45,7 +45,7 @@ class PaymentProcessor {
             outAsset = outAssetValue
 			outAssetType = outAssetTypeValue
 			inAssetType = inAssetTypeValue
-            outAmount = outAmountValue
+			inAmount = inAmountValue            
             status = statusValue
             lastUpdatedBlockId = lastUpdatedBlockIdValue
         }
@@ -116,14 +116,14 @@ class PaymentProcessor {
                 def txid = row.SourceTxid
                 def sourceAddress = row.sourceAddress
                 def destinationAddress = row.destinationAddress
-                def outAsset = row.outAsset
-                def outAmount = row.outAmount
+                def outAsset = row.outAsset               
                 def status = row.status
                 def lastUpdated = row.lastUpdatedBlockId
 				def outAssetType = row.outAssetType
 				def inAssetType = row.inAssetType
+				def inAmount = row.inAmount
 				
-                result = new Payment(blockIdSource, txid, sourceAddress, inAssetType, destinationAddress, outAsset, outAssetType, outAmount, status, lastUpdated)
+                result = new Payment(blockIdSource, txid, sourceAddress, inAssetType, inAmount, destinationAddress, outAsset, outAssetType, status, lastUpdated)
             }
         }
 
@@ -167,14 +167,14 @@ class PaymentProcessor {
 		return balance.result
 	}
 
-    public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent)
+    public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent, outAmount)
     {
         def counterparty_sourceAddress = payment.sourceAddress // TODO 
 		def mastercoin_sourceAddress  = payment.sourceAddress // TODO 
         def blockIdSource = payment.blockIdSource
         def asset = payment.inAsset
         def dividend_asset = payment.outAsset
-        def amount = payment.outAmount
+        def amount = outAmount
         def asset_balance = 0
        
         log4j.info("Processing dividend payment ${payment.blockIdSource} ${payment.txid}. Sending dividend_percent ${dividend_percent } ")
@@ -217,13 +217,10 @@ class PaymentProcessor {
         try {
             counterpartyAPI.broadcastSignedTransaction(counterparty_signedTransaction)
 			mastercoinAPI.sendDividend(mastercoin_sourceAddress, quantity_per_share_dividend * mastercoin_numberOfTokenIssued, asset, dividend_asset) // TODO check
-            log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-            // db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
         }
         catch (Throwable e) {
             log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-            db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-			
+            db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")			
             assert e == null
         }
 
@@ -232,36 +229,37 @@ class PaymentProcessor {
 
         log4j.info("Payment dividend ${sourceAddress} -> quantity_per_share_dividend ${quantity_per_share_dividend/satoshi} ${asset} complete")
         if (testMode == true) log4j.info("Test mode: Payment 12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7 -> 142UYTzD1PLBcSsww7JxKLck871zRYG5D3 " + 20000/satoshi + "${asset} complete")
-
-//        return unsignedTransaction
-
     }
 	
-	public pay(Long currentBlock, Payment payment,Long dividend_percent) {
+	public exchange(Long currentBlock, Payment payment,Long dividend_percent) {
+	
+	}
+	
+	public pay(Long currentBlock, Payment payment, Long dividend_percent, Long outAmount) {
 		
         def sourceAddress = payment.sourceAddress
         def blockIdSource = payment.blockIdSource
         def destinationAddress = payment.destinationAddress
         def asset = payment.outAsset
-        def amount = payment.outAmount
+        
+		def amount = outAmount		
+		
+		// TODO check if amount < 0 and issue warning!!!
 		
         log4j.info("amount= {$amount} dividend_percent={$dividend_percent}")
 
         // Calculate the payment to the address after reducing the divided
 		// TODO check rounding 
-        amount = amount*((100-dividend_percent)/100) 
-
-        amount = Math.round(amount)
+        amount = amount*((100-dividend_percent)/100)      
 
         log4j.info("amount= after {$amount} ")
 
-
-        log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${payment.outAmount / satoshi} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
+        log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${outAmount / satoshi} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
 
         bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
         bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 
-		if (payment.outAssetType == Asset.COUNTERPARTY_TYPE) {
+		if (payment.outAssetType == Asset.COUNTERPARTY_TYPE || payment.outAssetType == Asset.NATIVE_TYPE ) {
 			// Create the (unsigned) counterparty send transaction
 			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode)
 			assert unsignedTransaction instanceof java.lang.String
@@ -278,8 +276,8 @@ class PaymentProcessor {
 			// send transaction
 			try {
 				counterpartyAPI.broadcastSignedTransaction(signedTransaction)
-				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock}, outAmount = ${amount} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock}, outAmount = ${amount} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 			}
 			catch (Throwable e) {
 				log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
@@ -307,8 +305,6 @@ class PaymentProcessor {
 
         log4j.info("Payment ${sourceAddress} -> ${destinationAddress} ${amount/satoshi} ${asset} complete")
         if (testMode == true) log4j.info("Test mode: Payment 12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7 -> 142UYTzD1PLBcSsww7JxKLck871zRYG5D3 " + 20000/satoshi + "${asset} complete")
-
-//        return unsignedTransaction
     }
 
 
@@ -324,14 +320,15 @@ class PaymentProcessor {
 
         log4j.info("Payment processor started")
         log4j.info("Last processed payment: " + paymentProcessor.getLastPaymentBlock())
-		// counterpartyAPI.getBalances("sdfsdf")
-
+	
         // Begin following blocks
         while (true) {
             def blockHeight = bitcoinAPI.getBlockHeight()
             def lastPaymentBlock = paymentProcessor.getLastPaymentBlock()
             def Payment payment = paymentProcessor.getNextPayment()
 
+			// TODO we want to make sure that all followers have finished processing each block !!! 
+					
             assert lastPaymentBlock <= blockHeight
 
             log4j.info("Block ${blockHeight}")
@@ -343,29 +340,24 @@ class PaymentProcessor {
 //            if (lastPaymentBlock >= blockHeight && payment != null) {
 //                log4j.info("Payment to make but already paid already this block. Sleeping...")
 //            }
+
             if (payment != null) {
-                if (payment.inAssetType == Asset.NATIVE_TYPE){
-					if (payment.outAssetType != Asset.NATIVE_TYPE){
-						// This is an issuing transaction, we need to pay dividend
-						log4j.info("payment.outAsset ${payment.outAsset}")
-						paymentProcessor.pay_dividend(blockHeight, payment,dividend_percent)
-						paymentProcessor.pay(blockHeight, payment,dividend_percent)
-					} else {
-						// This is a refund transaction... 
-						// TODO 
-					}					
-				} else if (payment.outAssetType == Asset.NATIVE_TYPE) {
-					// This is a sell transaction... 
-					paymentProcessor.pay(blockHeight, payment,0)
-					log4j.info("--------------BURN-------------")
-				} else if ((payment.inAssetType == Asset.MASTERCOIN_TYPE && payment.outAssetType == Asset.COUNTERPARTY_TYPE ) || 
+                if (payment.inAssetType == Asset.NATIVE_TYPE){					
+					log4j.info("--------------BUY TRANSACTION-------------")
+					// This is an issuing transaction, we need to pay dividend
+					def zoozAmount = computeZoozAmount(payment.inAmount)
+					paymentProcessor.pay_dividend(blockHeight, payment, dividend_percent, zoozAmount)
+					paymentProcessor.pay(blockHeight, payment,dividend_percent, zoozAmount)
+				} else if (payment.outAssetType == Asset.NATIVE_TYPE) {					
+					log4j.info("--------------BURN TRANSACTION-------------")
+					paymentProcessor.pay(blockHeight, payment,0, computeNativeAmount(payment.inAmount))					
+				} else if ((payment.inAssetType == Asset.MASTERCOIN_TYPE && payment.outAssetType == Asset.COUNTERPARTY_TYPE ) || 				
 					(payment.inAssetType == Asset.COUNTERPARTY_TYPE && payment.outAssetType == Asset.MASTERCOIN_TYPE)) {
-					// TODO This is an exchange transaction
-					paymentProcessor.pay(blockHeight, payment,0)
-					
 					log4j.info("----------------- EXCHANGE TRANSACTION -----------------")
+					def outAmount = computeExchangedAmount(payment.inAmount)
+					paymentProcessor.pay(blockHeight, payment,0, outAmount)									
 				} else {				
-					log4j.info("----------------- UNKOWN TRANSACTION TYPE -----------------")
+					log4j.info("----------------- UNKOWN TRANSACTION TYPE ??? -----------------")
 				}
 				
                 log4j.info("Sleeping...payment.outAsset ${payment.outAsset}")
@@ -378,4 +370,57 @@ class PaymentProcessor {
         }
 
     }
+	
+	// Functions for exchange rates!!! 
+	
+	private computeZoozAmount(Long nativeAmount) {
+		return nativeAmount * satoshi / 200
+	}
+	
+	
+	private computeNativeAmount(Long zoozAmount) { 
+		return satoshi*zoozAmount / 200
+	}
+/*
+	private computeZoozAmount(Long nativeAmount) {	
+		def result = nativeAmount - getFee()
+		return result * computeUpperMargin()
+	}
+	
+	private computeNativeAmount(Long zoozAmount) { 
+		
+		def result = zoozAmount * computeLowerMargin()
+		return result - getFee()
+	}
+	
+	private computeExchangedAmount(Long zoozAmount) { 
+	}
+	
+	// TODO save this in the DB? 
+	private getZoozMined() {}
+	}
+	
+	private getZoozPurchased() {
+		
+	}
+	
+	private getReserveBTC() {		
+	}
+	
+	private getWorthOfMinedZooz() {
+	
+	}
+	
+	private computeLowerMargin() { 
+		return getReserveBTC() / (getZoozMined() + getZoozPurchased())
+	}
+	
+	private computeUpperMargin() {
+		return getWorthOfMinedZooz() /(getZoozMined() + getZoozPurchased())
+	}
+	
+	private getFee() {
+	}
+*/
+		
 }

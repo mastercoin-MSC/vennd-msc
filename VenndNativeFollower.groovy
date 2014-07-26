@@ -14,17 +14,12 @@ public class VenndNativeFollower {
     static logger
     static log4j
     static bitcoinAPI
-    static satoshi = 100000000
-    static boolean outAssetDivisible
-    static boolean outAssetIssuanceDependent
-    static int inceptionBlock
-    static BigDecimal feeAmountPercentage
+    static satoshi = 100000000        
+    static int inceptionBlock    
     static assetConfig
     static boolean testMode
     static int confirmationsRequired
-    static int sleepIntervalms
-    static String outAssetNonDivisibleRoundRule
-    static Long outAssetMultiplier
+    static int sleepIntervalms        
     static String databaseName
     static db
 
@@ -35,68 +30,34 @@ public class VenndNativeFollower {
         def String sourceAddress
         def String destinationAddress
         def String outAsset
-	def String outAssetType
-        def Long outAmount
+		def String outAssetType        
         def Long lastModifiedBlockId
-        def String status
-        def Long refundAmount = 0
-        def String issuanceStatus
+        def String status                
+		def Long inAmount
 
-        public Payment(String inAssetValue, Long currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, String outAssetTypeValue, Long outAmountValue, Long lastModifiedBlockIdValue, Long originalAmount, boolean unclearSource) {
+        public Payment(String inAssetValue, Long currentBlockValue, String txidValue, String sourceAddressValue, String destinationAddressValue, String outAssetValue, String outAssetTypeValue, Long lastModifiedBlockIdValue, Long inAmountValue, boolean unclearSource) {
             def row
             inAsset = inAssetValue
             outAsset = outAssetValue
 			outAssetType = outAssetTypeValue
+			inAmount = inAmountValue
 		
-	    sourceAddress = sourceAddressValue
-	    destinationAddress = destinationAddressValue
-			
-            outAmount = outAmountValue * outAssetMultiplier
-            // Treat indivisible asset differently as they aren't multiplied by the satoshi factor
-            if (!outAssetDivisible) {
-                def Float outAmountFloat = outAmount / satoshi
-
-                if (outAssetNonDivisibleRoundRule == 'floor') {
-                    outAmount = Math.floor(outAmountFloat)
-                    refundAmount = 0
-                }
-                else if (outAssetNonDivisibleRoundRule == 'ceiling') {
-                    outAmount = Math.ceil(outAmountFloat)
-                    refundAmount = 0
-                }
-                else if (outAssetNonDivisibleRoundRule == 'roundRefund') {
-                    outAmount = Math.round(outAmountFloat)
-                    refundAmount = 0 // to do
-                }
-                else {
-                    outAmount = Math.round(outAmountFloat)
-                    refundAmount = 0
-                }
-
-            }
+			sourceAddress = sourceAddressValue
+			destinationAddress = destinationAddressValue
+			                        
             currentBlock = currentBlockValue
             txid = txidValue
             lastModifiedBlockId = lastModifiedBlockIdValue
 
 //            if (originalAmount <= satoshi) {
 			//No more than 10 BTC for now...:)
-            if (originalAmount <= satoshi*10) {
+            if (inAmountValue <= satoshi*10) {
                 status = 'authorized'
             }
             else {
                 status = 'valid'
             }
 
-            // If a precise amount of asset must be issued each time, payments must wait until the asset is issued
-            if (outAssetIssuanceDependent) {
-                issuanceStatus = status
-                status = 'waitIssuance'
-            }
-
-            // If the source address appeared to come from a wallet which isn't Counterwallet, default the payment to manual
-            if (unclearSource) {
-                status = 'manual'
-            }
         }
     }
 
@@ -110,17 +71,12 @@ public class VenndNativeFollower {
         log4j = logger.getRootLogger()
 
         // Read in ini file
-        def iniConfig = new ConfigSlurper().parse(new File("VenndNativeFollower.ini").toURL())
-        outAssetDivisible = iniConfig.outAssetDivisible
-        outAssetIssuanceDependent = iniConfig.outAssetIssuanceDependent
-        inceptionBlock = iniConfig.inceptionBlock
-        feeAmountPercentage = iniConfig.feeAmountPercentage
+        def iniConfig = new ConfigSlurper().parse(new File("VenndNativeFollower.ini").toURL())        
+        inceptionBlock = iniConfig.inceptionBlock        
         testMode = iniConfig.testMode
         sleepIntervalms = iniConfig.sleepIntervalms
         databaseName = iniConfig.database.name
-        confirmationsRequired = iniConfig.confirmationsRequired
-        outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
-        outAssetMultiplier = iniConfig.outAssetMultiplier
+        confirmationsRequired = iniConfig.confirmationsRequired        
 
         assetConfig = Asset.readAssets("AssetInformation.ini")
 
@@ -216,8 +172,7 @@ public class VenndNativeFollower {
             def inputAddresses = []
             def outputAddresses = []
             def amounts = [] //same position as address in outputAddresses
-            def Long inAmount = 0
-            def Long outAmount = 0
+            def Long inAmount = 0            
             def decodedTransaction = bitcoinAPI.getTransaction(rawTransaction)
             def txid = decodedTransaction.txid
             def Asset asset 
@@ -264,41 +219,6 @@ public class VenndNativeFollower {
                 inAmount = amounts[listenerAddressIndex] * satoshi
                 assert inAmount > 0
 
-
-                // Calculate fee
-                def amountMinusTX
-                def calculatedFee
-
-                // Remove the TX Fee first from calculations
-                amountMinusTX = inAmount - (asset.txFee * satoshi)
-
-                // If the amount that was sent was less than the cost of TX then eat the whole amount
-                if (amountMinusTX < 0) {
-                    amountMinusTX = 0
-                }
-
-                if (amountMinusTX > 0) {
-                    calculatedFee = ((amountMinusTX * feeAmountPercentage / 100) + (asset.txFee * satoshi)).toInteger()
-
-                    if (inAmount < calculatedFee) {
-                        calculatedFee = inAmount
-                    }
-                }
-                else {
-                    calculatedFee = inAmount
-                }
-
-                // Set out amount if it is more than a satoshi
-                if (inAmount - calculatedFee >= 1) {
-                    outAmount = inAmount - calculatedFee
-                }
-                else {
-                    outAmount = 0
-                }
-
-
-                assert inAmount == outAmount + calculatedFee  // conservation of energy
-
                 //Get input addresses
                 for (vin in decodedTransaction.vin) {
                     def position = vin.vout
@@ -326,8 +246,8 @@ public class VenndNativeFollower {
 
                 // Only record if one of the input addresses is NOT the service address. ie we didn't initiate the send
                 // if (inputAddresses.contains(listenerAddress) == false) {
-                parsedTransactions.add([txid, inputAddresses, outputAddresses, inAmount, asset.nativeAssetName, outAmount, outAsset, calculatedFee, serviceAddress, type, notCounterwalletSend])
-                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${asset.nativeAssetName} -> ${outAmount/satoshi} ${outAsset} (${calculatedFee/satoshi} ${asset.nativeAssetName} fee collected)"
+                parsedTransactions.add([txid, inputAddresses, outputAddresses, inAmount, asset.nativeAssetName, outAsset, serviceAddress, type, notCounterwalletSend])
+                println "Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${outputAddresses} ${inAmount/satoshi} ${asset.nativeAssetName} -> ${outAsset} )"
                 //}
             }
 
@@ -341,53 +261,21 @@ public class VenndNativeFollower {
             for (transaction in parsedTransactions) {
                 def txid = transaction[0]
                 def inputAddress = transaction[1][0]            // pick the first input address if there is more than 1
-                def String serviceAddress = transaction[8]  // take the service address as the address that was sent to
+                
                 def inAmount = transaction[3]
-                def inAsset = transaction[4]
-                def outAmount = transaction[5]
-                def outAsset = transaction[6]
-                def feeAmount = transaction[7]
-				def outAssetType = transaction[9]
-                def notCounterwalletSend = transaction[10]
-                def feeAsset = inAsset
+                def inAsset = transaction[4]                
+                def outAsset = transaction[5]               
+				def String serviceAddress = transaction[6]  // take the service address as the address that was sent to
+				def outAssetType = transaction[7]
+                def notCounterwalletSend = transaction[8]                
 
                 // there will only be 1 output for counterparty assets but not the case for native assets - ie change
                 // form a payment object which will determine the payment direction and source and destination addresses
-                def payment = new Payment(inAsset, currentBlock, txid, inputAddress, serviceAddress, outAsset,outAssetType, outAmount, currentBlock, inAmount, notCounterwalletSend)
+                def payment = new Payment(inAsset, currentBlock, txid, inputAddress, serviceAddress, outAsset,outAssetType, currentBlock, inAmount, notCounterwalletSend)			
 
-                println "insert into transactions values (${currentBlock}, ${txid})"
-                db.execute("insert into transactions values (${currentBlock}, ${txid})")
-                for (eachInputAddress in transaction[1]) {
-                    println "insert into inputAddresses values (${txid}, ${eachInputAddress})"
-                    db.execute("insert into inputAddresses values (${txid}, ${eachInputAddress})")
-                }
-                for (outputAddress in transaction[2]) {
-                    println "insert into outputAddresses values (${txid}, ${outputAddress})"
-                    db.execute("insert into outputAddresses values (${txid}, ${outputAddress})")
-                }
-				
-				// TODO handle type
-                println "insert into credits values (${currentBlock}, ${txid}, ${inputAddress}, '', ${inAsset}, ${inAmount}, ${outAsset}, ${outAmount}, 'valid')"
-                db.execute("insert into credits values (${currentBlock}, ${txid}, ${inputAddress}, '', ${inAsset}, ${inAmount}, ${outAsset}, ${outAmount}, 'valid')")
-                println "insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount})"
-                db.execute("insert into fees values (${currentBlock}, ${txid}, ${feeAsset}, ${feeAmount})")
-                if (payment.outAmount > 0) {
-                    if (outAssetIssuanceDependent) {
-						// TODO handle type
-                        // create table if not exists issuances(blockId integer, sourceTxid string, sourceAddress string, asset string, amount integer, divisibility string, status string, lastUpdatedBlockId integer)
-                        println "insert into issuances values (${currentBlock}, ${txid}, ${inputAddress}, ${outAsset}, ${payment.outAmount}, ${outAssetDivisible}, ${payment.issuanceStatus}, ${currentBlock})"
-                        db.execute("insert into issuances values (${currentBlock}, ${txid}, ${inputAddress}, ${outAsset}, ${payment.outAmount}, ${outAssetDivisible}, ${payment.issuanceStatus}, ${currentBlock})")
-                    }
+                println    "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress},  ${Asset.NATIVE_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0,  ${payment.status}, ${payment.lastModifiedBlockId})"
+                db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress},  ${Asset.NATIVE_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0, ${payment.status}, ${payment.lastModifiedBlockId})")
 
-                    println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE},  ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})"
-                    db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, ${payment.outAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
-
-                    // process a refund
-                    if (payment.refundAmount > 0) {
-                        println "insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId}) -- refund"
-                        db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.NATIVE_TYPE}, ${payment.destinationAddress}, ${payment.inAsset}, Asset.NATIVE_TYPE, ${payment.refundAmount}, ${payment.status}, ${payment.lastModifiedBlockId})")
-                    }
-                }
             }
             db.execute("commit transaction")
         } catch (Throwable e) {
