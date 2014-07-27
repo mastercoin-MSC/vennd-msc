@@ -118,7 +118,7 @@ class MastercoinAPI {
 		return null
     }	
 	
-    public sendDividend(sourceAddress, total_quantity, asset, dividend_asset) {
+    public sendDividend(sourceAddress, total_quantity, dividend_asset) {
 		return sendRPCMessage('sendtoowners_MP',[sourceAddress, total_quantity,Integer.parseInt(dividend_asset, 10)])
 	}
 		

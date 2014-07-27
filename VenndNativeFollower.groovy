@@ -203,13 +203,13 @@ public class VenndNativeFollower {
 					found = true
 					asset = assetRec
 					type = Asset.MASTERCOIN_TYPE
-					outAsset = asset.mastercoinAssetName 
+					outAsset = asset.mastercoinAssetName 				
 				} else if (outputAddresses.contains(assetRec.nativeAddressCounterparty)) { 
 					serviceAddress = assetRec.nativeAddressCounterparty
 					found = true
 					asset = assetRec
 					type = Asset.COUNTERPARTY_TYPE
-					outAsset = asset.counterpartyAssetName 
+					outAsset = asset.counterpartyAssetName 					
 				} 
 			}
 
