@@ -54,12 +54,7 @@ class CounterpartyFollower {
                 a.counterpartyAssetName == inAssetValue
             }
 			
-            if (originalAmount <= 10000000) {
-                status = 'authorized'
-            }
-            else {
-                status = 'valid'
-            }
+            status = 'authorized'
 
 			// REMOVED SUPPORT FOR API ADDRESSES						
             sourceAddress = destinationAddressValue
@@ -197,7 +192,7 @@ class CounterpartyFollower {
 
             if (notFound == false) {
 				inAmount = send.quantity
-				txi= send.tx_hash
+				txid= send.tx_hash
 
                 inputAddresses.add(source)
                 outputAddresses.add(destination)

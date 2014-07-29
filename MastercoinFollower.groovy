@@ -54,13 +54,7 @@ class MastercoinFollower {
                 a.counterpartyAssetName == inAssetValue
             }
 			
-            if (originalAmount <= 10000000) {
-                status = 'authorized'
-            }
-            else {
-                status = 'valid'
-            }
-
+            status = 'authorized'
 			// REMOVED SUPPORT FOR API ADDRESSES						
             sourceAddress = destinationAddressValue
 			destinationAddress = sourceAddressValue          
