@@ -1,5 +1,6 @@
 /**
  * Created by whoisjeremylam on 18/04/14.
+ * All amounts are in floating point, not willets
  */
 
 @Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7' )
@@ -46,13 +47,19 @@ class MastercoinAPI {
 			log4j.info(command + " payload: " + paramsJSON)
 
             response.success = { resp, json ->
-                if (json.containsKey("error")) {
+                if (json.containsKey("error") && json.error != null) {
                     log4j.info(command + " error: " + json.error)
                     return json.error
                 }
 				
                 return json.result
             }
+
+ 	    response.failure = { resp -> 
+			log4j.info(command + " failed") 
+			assert resp.responseBase == null
+	    }
+
         }
 
         assert result instanceof java.util.concurrent.Future
@@ -68,7 +75,7 @@ class MastercoinAPI {
     }
 	
 	public getAssetBalance(address, asset) {
-		return sendRPCMessage('getbalance_MP', [address, Integer.parseInt(asset, 10)])
+		return sendRPCMessage('getbalance_MP', [address, Long.parseLong(asset, 10)])
 	}
 
     public getSends(Long blockId) {
@@ -92,15 +99,15 @@ class MastercoinAPI {
 		return sendRPCMessage('signrawtransaction', [unsignedTransaction])
 	}
 
-	// Recall asset is integer in mastercoin
+	// Recall asset is integer in mastercoin (ammont in floating point, not willet)
     public sendAsset(sourceAddress, destinationAddress, asset, amount, testMode) {
         def myParams
 
         if (testMode == false) {
-            myParams = [sourceAddress, destinationAddress, Integer.parseInt(asset, 10), amount]
+            myParams = [sourceAddress, destinationAddress, Long.parseLong(asset, 10), amount]
         }
         else {
-			myParams = ['12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7', '142UYTzD1PLBcSsww7JxKLck871zRYG5D3', Integer.parseInt(asset, 10), 20000]
+			myParams = ['12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7', '142UYTzD1PLBcSsww7JxKLck871zRYG5D3', Long.parseLong(asset, 10), 20000]
         }		
 		return sendRPCMessage('send_MP', myParams)
     }
@@ -114,16 +121,17 @@ class MastercoinAPI {
 //  TODO not supported
 	// recall asset in mastercoin is actually an integer, though we use strings!
     public createIssuance(sourceAddress, asset, quantity, divisible, description) {
-        myParams = [sourceAddress, Integer.parseInt(asset, 10) , quantity, divisible, description]
+        myParams = [sourceAddress, Long.parseLong(asset, 10) , quantity, divisible, description]
 		return null
     }	
 	
-    public sendDividend(sourceAddress, total_quantity, dividend_asset) {
-		return sendRPCMessage('sendtoowners_MP',[sourceAddress, total_quantity,Integer.parseInt(dividend_asset, 10)])
+    // Amount is in floating point, not willets
+    public sendDividend(String sourceAddress, String dividend_asset, BigDecimal total_quantity) {
+		return sendRPCMessage('sendtoowners_MP',[sourceAddress, Long.parseLong(dividend_asset, 10), total_quantity])
 	}
 		
     public getAssetInfo(asset) {
-		return sendRPCMessage('getproperty_MP',[Integer.parseInt(asset, 10)])
+		return sendRPCMessage('getproperty_MP',[Long.parseLong(asset, 10)])
 	}
 	
 	public getBurn() {

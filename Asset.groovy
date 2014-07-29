@@ -67,7 +67,7 @@ public class Asset {
             if (it.value.issuanceDivisible instanceof groovy.util.ConfigObject) { issuanceDivisible = true} else {issuanceDivisible = it.value.issuanceDivisible}
             if (it.value.issuanceDescription instanceof groovy.util.ConfigObject) { issuanceDescription = ""} else {issuanceDescription = it.value.issuanceDescription}
 
-            def currentAsset = new Asset(it.value.counterpartyAssetName, it.value.mastercoinAssetName, it.value.nativeAssetName, it.value.counterpartyAddress, it.value.mastercoinAddress, it.value.nativeAddressCountrparty , it.value.nativeAddressMastercoin, it.value.counterpartyToMastercoinAddress,it.value.mastercoinToCounterpartyAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired, issuanceDependent, issuanceSource, issuanceAsset, issuanceDivisible, issuanceDescription)
+            def currentAsset = new Asset(it.value.counterpartyAssetName, it.value.mastercoinAssetName, it.value.nativeAssetName, it.value.counterpartyAddress, it.value.mastercoinAddress, it.value.nativeAddressCounterparty , it.value.nativeAddressMastercoin, it.value.counterpartyToMastercoinAddress,it.value.mastercoinToCounterpartyAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired, issuanceDependent, issuanceSource, issuanceAsset, issuanceDivisible, issuanceDescription)
             assetConfig.add(currentAsset)
         }
 		

@@ -155,11 +155,11 @@ class PaymentProcessor {
 	
 	def get_counterparty_notused(String sourceAddress, String asset) {
 		def balances = counterpartyAPI.getBalances(sourceAddress)
-		def asset_balaance = 0
+		def asset_balance = 0
 
 
         for (balance in balances) {
-            if (balance.asset == dividend_asset) 
+            if (balance.asset == asset) 
                 asset_balance = balance.quantity
         }
 		
@@ -167,13 +167,13 @@ class PaymentProcessor {
 	}
 	
 	def get_mastercoin_notused(String sourceAddress, String asset) {
-		def balance = mastercoinAPI.getBalance(sourceAddress,asset)
-		return balance.result
+		def balance = mastercoinAPI.getAssetBalance(sourceAddress,asset)
+		return balance
 	}
 	
-	private findAssetConfig(Payment payment) { 
+	private findAssetConfig(Payment payment) {
 		for (assetRec in assetConfig) {
-			if (payment.destinatationAdderss == assetRec.nativeAddressCountrparty || payment.destinatationAdderss == assetRec.nativeAddressMastercoin) { 
+			if (payment.sourceAddress == assetRec.nativeAddressCounterparty || payment.sourceAddress == assetRec.nativeAddressMastercoin) { 
 				return assetRec
 			} 
 		}
@@ -181,8 +181,9 @@ class PaymentProcessor {
 
     public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent, outAmount)
     {
+	// outAmount is in satoshi
 		def relevantAsset = findAssetConfig(payment)
-        def counterparty_sourceAddress = relevantAsset.nativeAddressCountrparty
+        def counterparty_sourceAddress = relevantAsset.nativeAddressCounterparty
 		def mastercoin_sourceAddress  = relevantAsset.nativeAddressMastercoin
         def blockIdSource = payment.blockIdSource
         def amount = outAmount
@@ -192,28 +193,35 @@ class PaymentProcessor {
         bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
  
         def counterparty_numberOfTokenIssued = get_total_counterparty(relevantAsset.counterpartyAssetName) 
-		def counterparty_asset_balance = get_counterparty_notused(sourceAddress)
+		def counterparty_asset_balance = get_counterparty_notused(counterparty_sourceAddress,relevantAsset.counterpartyAssetName)
 		def counterparty_tokensOutThere = counterparty_numberOfTokenIssued-counterparty_asset_balance
 		
-		def mastercoin_numberOfTokenIssued = get_total_mastercoin(relevantAsset.mastercoinAssetName) 
-		def mastercoin_asset_balance = get_mastercoin_notused(sourceAddress)
+		def mastercoin_numberOfTokenIssued = get_total_mastercoin(relevantAsset.mastercoinAssetName) * satoshi 
+		def mastercoin_asset_balance = get_mastercoin_notused(mastercoin_sourceAddress,relevantAsset.mastercoinAssetName) * satoshi
 		def mastercoin_tokensOutThere = mastercoin_numberOfTokenIssued-mastercoin_asset_balance
 		
 		def totalTokens = mastercoin_tokensOutThere + counterparty_tokensOutThere
 		
 		
 		//////////////////////////////////////////////////////////////////////////// BTC
-		def counterparty_fraction = counterparty_tokensOutThere / (counterparty_tokensOutThere + mastercoin_tokensOutThere)
+		def counterparty_fraction = 1.0 * counterparty_tokensOutThere / (counterparty_tokensOutThere + mastercoin_tokensOutThere)
 
         log4j.info("pay_dividend in counterparty asset_balance ${counterparty_asset_balance} numberOfTokenIssued = ${counterparty_numberOfTokenIssued} tokensOutThere = ${counterparty_tokensOutThere} ")
-		log4j.info("pay_dividend in mastercoin asset_balance ${mastercoin_balance} numberOfTokenIssued = ${mastercoin_numberOfTokenIssued} tokensOutThere = ${mastercoin_tokensOutThere} ")
-        def quantity_per_share_dividend = Math.round(((amount*dividend_percent)/100)/(totalTokens)*satoshi)
+		log4j.info("pay_dividend in mastercoin asset_balance ${mastercoin_asset_balance} numberOfTokenIssued = ${mastercoin_numberOfTokenIssued} tokensOutThere = ${mastercoin_tokensOutThere} ")
+	log4j.info("Computation: amount ${amount} dividend_percent ${dividend_percent} totalTokens ${totalTokens}")
+
+        def quantity_per_share_dividend = Math.round((1.0*amount*dividend_percent)/100/(totalTokens)*satoshi)*1.0/satoshi
+
+	if (quantity_per_share_dividend == 0) {
+		log4j.info("No dividend needed") 
+		return
+	} 
 		
         // Create the (unsigned) counterparty dividend transaction    
-        def counterparty_unsignedTransaction = counterpartyAPI.sendDividend(sourceAddress, quantity_per_share_dividend, relevantAsset.counterpartyAssetName,relevantAsset.counterpartyAssetName)		
+        def counterparty_unsignedTransaction = counterpartyAPI.sendDividend(counterparty_sourceAddress, Math.round(satoshi*quantity_per_share_dividend), relevantAsset.counterpartyAssetName,relevantAsset.counterpartyAssetName)		
         assert counterparty_unsignedTransaction instanceof java.lang.String
         assert counterparty_unsignedTransaction != null
-        if (!(unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
+        if (!(counterparty_unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
             assert counterparty_unsignedTransaction.code == null
         }
 
@@ -225,7 +233,9 @@ class PaymentProcessor {
         // send transaction
         try {
             counterpartyAPI.broadcastSignedTransaction(counterparty_signedTransaction)
-			mastercoinAPI.sendDividend(mastercoin_sourceAddress, quantity_per_share_dividend * mastercoin_numberOfTokenIssued,relevantAsset.mastercoinAssetName) 
+	    if (mastercoin_tokensOutThere > 0 && quantity_per_share_dividend * mastercoin_tokensOutThere > 1.0) { 
+			mastercoinAPI.sendDividend(mastercoin_sourceAddress,relevantAsset.mastercoinAssetName, quantity_per_share_dividend * mastercoin_tokensOutThere/satoshi) 
+	    }
         }
         catch (Throwable e) {
             log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
@@ -236,7 +246,7 @@ class PaymentProcessor {
         // Lock bitcoin wallet
         bitcoinAPI.lockBitcoinWallet()
 
-        log4j.info("Payment dividend ${sourceAddress} -> quantity_per_share_dividend ${quantity_per_share_dividend/satoshi} ${asset} complete")
+        log4j.info("Payment dividend quantity_per_share_dividend ${quantity_per_share_dividend/satoshi} complete")
         if (testMode == true) log4j.info("Test mode: Payment 12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7 -> 142UYTzD1PLBcSsww7JxKLck871zRYG5D3 " + 20000/satoshi + "${asset} complete")
     }
 	
@@ -244,7 +254,7 @@ class PaymentProcessor {
 	
 	}
 	
-	public pay(Long currentBlock, Payment payment, Long dividend_percent, Long outAmount) {
+	public pay(Long currentBlock, Payment payment, Long dividend_percent, BigDecimal outAmount) {
 		
         def sourceAddress = payment.sourceAddress
         def blockIdSource = payment.blockIdSource
@@ -263,7 +273,7 @@ class PaymentProcessor {
 
         log4j.info("amount= after {$amount} ")
 
-        log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${outAmount / satoshi} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
+        log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${outAmount} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
 
         bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
         bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
@@ -297,7 +307,7 @@ class PaymentProcessor {
 		} else {
 			// send transaction
 			try {
-				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset, amount, testMode)
+				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, Long.toString(asset,10), amount/satoshi, testMode)
 				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 			}
@@ -312,7 +322,7 @@ class PaymentProcessor {
         // Lock bitcoin wallet
         bitcoinAPI.lockBitcoinWallet()
 
-        log4j.info("Payment ${sourceAddress} -> ${destinationAddress} ${amount/satoshi} ${asset} complete")
+        log4j.info("Payment ${sourceAddress} -> ${destinationAddress} ${amount} ${asset} complete")
         if (testMode == true) log4j.info("Test mode: Payment 12nY87y6qf4Efw5WZaTwgGeceXApRYAwC7 -> 142UYTzD1PLBcSsww7JxKLck871zRYG5D3 " + 20000/satoshi + "${asset} complete")
     }
 
@@ -383,12 +393,12 @@ class PaymentProcessor {
 	// Functions for exchange rates!!! 
 	
 	private computeZoozAmount(Long nativeAmount) {
-		return nativeAmount * satoshi / 200
+		return nativeAmount * 200.0
 	}
 	
 	
 	private computeNativeAmount(Long zoozAmount) { 
-		return satoshi*zoozAmount / 200
+		return zoozAmount / 200
 	}
 /*
 	private computeZoozAmount(Long nativeAmount) {	

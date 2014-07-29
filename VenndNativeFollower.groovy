@@ -42,8 +42,8 @@ public class VenndNativeFollower {
 			outAssetType = outAssetTypeValue
 			inAmount = inAmountValue
 		
-			sourceAddress = sourceAddressValue
-			destinationAddress = destinationAddressValue
+			sourceAddress = destinationAddressValue
+			destinationAddress = sourceAddressValue
 			                        
             currentBlock = currentBlockValue
             txid = txidValue
@@ -243,6 +243,8 @@ public class VenndNativeFollower {
                 if (uniqueChangeAddressesWithoutInput.size() > 1) {
                     notCounterwalletSend = true
                 }
+		
+		if (inputAddresses.contains(serviceAddress))  { continue } 
 
                 // Only record if one of the input addresses is NOT the service address. ie we didn't initiate the send
                 // if (inputAddresses.contains(listenerAddress) == false) {

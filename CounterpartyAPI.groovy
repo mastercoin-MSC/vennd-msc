@@ -1,5 +1,6 @@
 /**
  * Created by whoisjeremylam on 18/04/14.
+ * For divisible assets (or, all assets we use) amounts are in satoshis
  */
 
 @Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7' )
@@ -56,9 +57,9 @@ class CounterpartyAPI {
             return json.result
         }
 	    
- 	    response.failure { resp -> 
+ 	    response.failure = { resp -> 
 			log4j.info(command + " failed") 
-			assert resp.responesBase == null
+			assert resp.responseBase == null
 	    }
 
 		
@@ -133,7 +134,7 @@ class CounterpartyAPI {
     }
 
     public broadcastSignedTransaction(String signedTransaction) {
-		def result = sendRPCMessage('broadcast_tx', [signedTransaction])
+		def result = sendRPCMessage('broadcast_tx', ['signed_tx_hex':signedTransaction])
 		if (result == null) { 
 			log4j.info("broadcast_tx failed - null was returned")
 			assert result != null
@@ -142,7 +143,7 @@ class CounterpartyAPI {
     }
 
     public signTransaction(String unsignedTransaction) {
-		def result = sendRPCMessage('sign_tx', [unsignedTransaction])
+		def result = sendRPCMessage('sign_tx', ['unsigned_tx_hex':unsignedTransaction])
 		if (result == null) { 
 			log4j.info("signTransaction failed - null was returned")
 			assert result != null
@@ -206,7 +207,7 @@ class CounterpartyAPI {
 	
     //get_asset_info(assets)
     public getAssetInfo(asset) {
-		return sendRPCMessage('get_asset_info', [ [asset] ,])
+		return sendRPCMessage('get_asset_info', ['assets':[asset] ] )
 	}
  
 	// TODO this is not in the API. Why was it written???
