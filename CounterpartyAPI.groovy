@@ -73,21 +73,6 @@ class CounterpartyAPI {
        return result.get()
 	}
 
-
-    class Payload {
-        def String method
-        def Filters params
-        def String id
-        def String jsonrpc
-
-        public Payload(methodValue, paramsValue, idValue) {
-            method = methodValue
-            params = paramsValue
-            id = idValue
-            jsonrpc = "2.0"
-        }
-    }
-
     public class Filters {
         def FilterValue[] filters
 
@@ -123,6 +108,14 @@ class CounterpartyAPI {
         def filters = new Filters(filterValue)
 		return sendRPCMessage('get_balances', filters)
     }
+	
+	public getLastBroadcastOfStream(address, datastream_text) { 
+		def filterValue = new FilterValue('address', '==', address)
+		def secondFilterValue = new FilteValue('text', '==', datastream_text)
+        def filters = new Filters(filterValue)
+		filters.Add(secondFilterValue)
+		return sendRPCMessage('get_broadcasts', ["filters:" filters, "limit":1, "orderby": 'timestamp', order_dir='desc'])
+	}
 
 
     public getSends(Long blockId) {
@@ -174,7 +167,7 @@ class CounterpartyAPI {
 	}
 
     public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value) {
-		def result = sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
+		def result = sendRPCMessage('create_broadcast', ["sourceAddress, feeFraction, text, timestamp, value])
 		if (result == null) { 
 			log4j.info("create_broadcast failed - null was returned")
 			assert result != null

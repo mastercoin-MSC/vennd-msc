@@ -179,10 +179,10 @@ class PaymentProcessor {
 		}
 	}
 
-    public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent, outAmount)
+    public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent, outAmount, relevantAsset)
     {
 	// outAmount is in satoshi
-		def relevantAsset = findAssetConfig(payment)
+	
         def counterparty_sourceAddress = relevantAsset.nativeAddressCounterparty
 		def mastercoin_sourceAddress  = relevantAsset.nativeAddressMastercoin
         def blockIdSource = payment.blockIdSource
@@ -208,14 +208,14 @@ class PaymentProcessor {
 
         log4j.info("pay_dividend in counterparty asset_balance ${counterparty_asset_balance} numberOfTokenIssued = ${counterparty_numberOfTokenIssued} tokensOutThere = ${counterparty_tokensOutThere} ")
 		log4j.info("pay_dividend in mastercoin asset_balance ${mastercoin_asset_balance} numberOfTokenIssued = ${mastercoin_numberOfTokenIssued} tokensOutThere = ${mastercoin_tokensOutThere} ")
-	log4j.info("Computation: amount ${amount} dividend_percent ${dividend_percent} totalTokens ${totalTokens}")
+		log4j.info("Computation: amount ${amount} dividend_percent ${dividend_percent} totalTokens ${totalTokens}")
 
         def quantity_per_share_dividend = Math.round((1.0*amount*dividend_percent)/100/(totalTokens)*satoshi)*1.0/satoshi
 
-	if (quantity_per_share_dividend == 0) {
-		log4j.info("No dividend needed") 
-		return
-	} 
+		if (quantity_per_share_dividend == 0) {
+			log4j.info("No dividend needed") 
+			return
+		} 
 		
         // Create the (unsigned) counterparty dividend transaction    
         def counterparty_unsignedTransaction = counterpartyAPI.sendDividend(counterparty_sourceAddress, Math.round(satoshi*quantity_per_share_dividend), relevantAsset.counterpartyAssetName,relevantAsset.counterpartyAssetName)		
@@ -307,7 +307,7 @@ class PaymentProcessor {
 		} else {
 			// send transaction
 			try {
-				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, Long.toString(asset,10), amount/satoshi, testMode)
+				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset, amount/satoshi, testMode)
 				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 			}
@@ -361,19 +361,21 @@ class PaymentProcessor {
 //            }
 
             if (payment != null) {
+				def relevantAsset = findAssetConfig(payment)
+
                 if (payment.inAssetType == Asset.NATIVE_TYPE){					
 					log4j.info("--------------BUY TRANSACTION-------------")
 					// This is an issuing transaction, we need to pay dividend
-					def zoozAmount = paymentProcessor.computeZoozAmount(payment.inAmount)
-					paymentProcessor.pay_dividend(blockHeight, payment, dividend_percent, zoozAmount)
+					def zoozAmount = paymentProcessor.computeZoozAmount(payment.inAmount,asset)
+					paymentProcessor.pay_dividend(blockHeight, payment, dividend_percent, zoozAmount,relevantAsset)
 					paymentProcessor.pay(blockHeight, payment,dividend_percent, zoozAmount)
 				} else if (payment.outAssetType == Asset.NATIVE_TYPE) {					
 					log4j.info("--------------BURN TRANSACTION-------------")
-					paymentProcessor.pay(blockHeight, payment,0, paymentProcessor.computeNativeAmount(payment.inAmount))					
+					paymentProcessor.pay(blockHeight, payment,0, paymentProcessor.computeNativeAmount(payment.inAmount, asset))					
 				} else if ((payment.inAssetType == Asset.MASTERCOIN_TYPE && payment.outAssetType == Asset.COUNTERPARTY_TYPE ) || 				
 					(payment.inAssetType == Asset.COUNTERPARTY_TYPE && payment.outAssetType == Asset.MASTERCOIN_TYPE)) {
 					log4j.info("----------------- EXCHANGE TRANSACTION -----------------")
-					def outAmount = computeExchangedAmount(payment.inAmount)
+					def outAmount = computeExchangedAmount(payment.inAmount,asset)
 					paymentProcessor.pay(blockHeight, payment,0, outAmount)									
 				} else {				
 					log4j.info("----------------- UNKOWN TRANSACTION TYPE ??? -----------------")
@@ -391,7 +393,6 @@ class PaymentProcessor {
     }
 	
 	// Functions for exchange rates!!! 
-	
 	private computeZoozAmount(Long nativeAmount) {
 		return nativeAmount * 200.0
 	}
@@ -400,34 +401,36 @@ class PaymentProcessor {
 	private computeNativeAmount(Long zoozAmount) { 
 		return zoozAmount / 200
 	}
-/*
-	private computeZoozAmount(Long nativeAmount) {	
-		def result = nativeAmount - getFee()
-		return result * computeUpperMargin()
+
+/* 
+	private computeZoozAmount(Long nativeAmount, Asset asset) {	
+		def result = nativeAmount - getFee(asset)
+		return result * computeUpperMargin() * getBaseExchangeRate(asset)
 	}
 	
-	private computeNativeAmount(Long zoozAmount) { 
+	private computeNativeAmount(Long zoozAmount, Asset asset) { 		
+		def result = zoozAmount * computeLowerMargin() * getBaseExchangeRate(asset)
+		return result - getFee(asset)
+	}
+	
+	private computeExchangedAmount(Long zoozAmount, Asset asset) { 
 		
-		def result = zoozAmount * computeLowerMargin()
-		return result - getFee()
-	}
-	
-	private computeExchangedAmount(Long zoozAmount) { 
 	}
 	
 	// TODO save this in the DB? 
-	private getZoozMined() {}
+	private getZoozMined() {
 	}
 	
 	private getZoozPurchased() {
 		
 	}
 	
-	private getReserveBTC() {		
+	private getReserveBTC() {	
+	
 	}
 	
 	private getWorthOfMinedZooz() {
-	
+		
 	}
 	
 	private computeLowerMargin() { 
@@ -438,7 +441,13 @@ class PaymentProcessor {
 		return getWorthOfMinedZooz() /(getZoozMined() + getZoozPurchased())
 	}
 	
-	private getFee() {
+	private getFee(asset) {
+		return asset.txFee
+	}
+	
+	private getBaseExchangeRate(asset) { 
+		def last = counterpartyAPI.getLastBroadcastOfStream(asset.counterpartyDataStreamAddress, asset.counterpartyZoozToNativeText)
+		return last[0].value		
 	}
 */
 		
