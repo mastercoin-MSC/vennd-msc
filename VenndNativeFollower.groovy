@@ -32,22 +32,23 @@ public class VenndNativeFollower {
     static String outAssetNonDivisibleRoundRule
     static Long outAssetMultiplier
     static String databaseName
+	static String machineType
     static db
 
     public class Asset {
-        def String counterpartyAssetName
+        def String outAssetName
         def String nativeAssetName
-        def String counterpartyAddress // the counterparty/bitcoin address side where we will receive the Counterparty asset
+        def String outAddress // the mastercoin or counterparty/bitcoin address side where we will receive the Counterparty asset
         def String nativeAddress // The address which users should send their native asset to
         def BigDecimal txFee
         def BigDecimal feePercentage
         def int inceptionBlock
         def boolean mappingRequired
 
-        public Asset(String counterpartyAssetNameValue, String nativeAssetNameValue, String counterpartyAddressValue, String nativeAddressValue, BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue) {
-            counterpartyAssetName = counterpartyAssetNameValue
+        public Asset(String outAssetNameValue, String nativeAssetNameValue, String outAddressValue, String nativeAddressValue, BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue) {
+            outAssetName = outAssetNameValueValue
             nativeAssetName = nativeAssetNameValue
-            counterpartyAddress = counterpartyAddressValue
+            outAddress = outAddressValue
             nativeAddress = nativeAddressValue
             txFee = txFeeValue
             feePercentage = feePercentageValue
@@ -75,7 +76,7 @@ public class VenndNativeFollower {
             outAmount = outAmountValue * outAssetMultiplier
             // Treat indivisible asset differently as they aren't multiplied by the satoshi factor
             if (!outAssetDivisible) {
-                def Float outAmountFloat = outAmount / satoshi
+				def Float outAmountFloat = outAmount / satoshi
 
                 if (outAssetNonDivisibleRoundRule == 'floor') {
                     outAmount = Math.floor(outAmountFloat)
@@ -93,7 +94,6 @@ public class VenndNativeFollower {
                     outAmount = Math.round(outAmountFloat)
                     refundAmount = 0
                 }
-
             }
             currentBlock = currentBlockValue
             txid = txidValue
@@ -107,6 +107,7 @@ public class VenndNativeFollower {
             }
 
             // If a precise amount of asset must be issued each time, payments must wait until the asset is issued
+			// Mastercoin has no issuance yet...
             if (outAssetIssuanceDependent) {
                 issuanceStatus = status
                 status = 'waitIssuance'
@@ -132,6 +133,7 @@ public class VenndNativeFollower {
                 row = db.firstRow ("select * from addressMaps where nativePaymentAddress = ${sourceAddressValue}")
                 if (row != null) {
                     sourceAddress = listenerAddress
+					
                     destinationAddress = row.counterpartyAddress
                     outAsset = outAsset
                 }
@@ -171,11 +173,19 @@ public class VenndNativeFollower {
         databaseName = iniConfig.database.name
         confirmationsRequired = iniConfig.confirmationsRequired
         outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
-        outAssetMultiplier = iniConfig.outAssetMultiplier
+        outAssetMultiplier = iniConfig.outAssetMultiplier	
+		machineType = iniConfig.machineType
 
         assetConfig = []
         iniConfig.asset.each { it ->
-            def currentAsset = new Asset(it.value.counterpartyAssetName, it.value.nativeAssetName, it.value.counterpartyAddress, it.value.nativeAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired)
+			def currentAsset
+			// This can be made 'blind' to the 2.0 protocol easily, but this is a reference implementation. 
+			// Mastercoin's asset names are actually numbers, but we will use strings.
+			if (machineType == 'Mastercoin') { 
+				currentAsset = new Asset(it.value.mastercoinAssetName, it.value.nativeAssetName, it.value.mastercoinAddress, it.value.nativeAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired)
+			} else {
+				currentAsset = new Asset(it.value.counterpartyAssetName, it.value.nativeAssetName, it.value.counterpartyAddress, it.value.nativeAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired)
+			}
             assetConfig.add(currentAsset)
         }
 

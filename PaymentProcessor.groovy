@@ -10,6 +10,7 @@ import groovy.sql.Sql
 
 class PaymentProcessor {
     static counterpartyAPI
+	static mastercoinAPI
     static bitcoinAPI
     static boolean testMode
 //    static String listenerBitcoinAddress
@@ -18,6 +19,7 @@ class PaymentProcessor {
     static String databaseName
     static String counterpartyTransactionEncoding
     static int walletUnlockSeconds
+	static String machineType 
 
     static logger
     static log4j
@@ -50,8 +52,8 @@ class PaymentProcessor {
 
 
     public init() {
-        counterpartyAPI = new CounterpartyAPI()
-        bitcoinAPI = new BitcoinAPI()
+	
+		bitcoinAPI = new BitcoinAPI()
 
         // Set up some log4j stuff
         logger = new Logger()
@@ -66,8 +68,15 @@ class PaymentProcessor {
         walletPassphrase = iniConfig.bitcoin.walletPassphrase
         sleepIntervalms = iniConfig.sleepIntervalms
         databaseName = iniConfig.database.name
-        counterpartyTransactionEncoding = iniConfig.counterpartyTransactionEncoding
         walletUnlockSeconds = iniConfig.walletUnlockSeconds
+		machineType = iniConfig.machineType
+		 
+		if (machineType == 'Mastercoin') {
+			mastercoinAPI = new MastercoinAPI(log4j)
+		} else {
+	        counterpartyTransactionEncoding = iniConfig.counterpartyTransactionEncoding
+			counterpartyAPI = new CounterpartyAPI()
+		}
 
         // Init database
         def row
@@ -160,34 +169,49 @@ class PaymentProcessor {
 
         log4j.info("Processing payment ${payment.blockIdSource} ${payment.txid}. Sending ${payment.outAmount / 100000000} ${payment.outAsset} from ${payment.sourceAddress} to ${payment.destinationAddress}")
 
-        bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
-        bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
+		bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
+		bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
+		
+		if (machineType == 'Mastercoin') { 						
+			// send transaction
+			try {
+				// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
+				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset, 1.0*amount/satoshi, testMode)
+				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+			} catch (Throwable e) {
+				log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+	
+				assert e == null
+			}							
+		} else {
+			// Create the (unsigned) counterparty send transaction
+			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)
+			assert unsignedTransaction instanceof java.lang.String
+			assert unsignedTransaction != null
+			if (!(unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
+				assert unsignedTransaction.code == null
+			}
 
-        // Create the (unsigned) counterparty send transaction
-        def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)
-        assert unsignedTransaction instanceof java.lang.String
-        assert unsignedTransaction != null
-        if (!(unsignedTransaction instanceof java.lang.String)) { // catch non technical error in RPC call
-            assert unsignedTransaction.code == null
-        }
+			// sign transaction
+			def signedTransaction = counterpartyAPI.signTransaction(unsignedTransaction, log4j)
+			assert signedTransaction instanceof java.lang.String
+			assert signedTransaction != null
 
-        // sign transaction
-        def signedTransaction = counterpartyAPI.signTransaction(unsignedTransaction, log4j)
-        assert signedTransaction instanceof java.lang.String
-        assert signedTransaction != null
+			// send transaction
+			try {
+				counterpartyAPI.broadcastSignedTransaction(signedTransaction, log4j)
+				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+			} catch (Throwable e) {
+				log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+	
+				assert e == null
+			}
+		} 
 
-        // send transaction
-        try {
-            counterpartyAPI.broadcastSignedTransaction(signedTransaction, log4j)
-            log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-            db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-        }
-        catch (Throwable e) {
-            log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-            db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-
-            assert e == null
-        }
 
         // Lock bitcoin wallet
         bitcoinAPI.lockBitcoinWallet()
