@@ -13,22 +13,22 @@
 import org.apache.log4j.*
 import groovy.sql.Sql
 
-class CounterpartyFollower {
+class MastercoinFollower {
     static logger
     static log4j
-    static counterpartyAPI
+    static mastercoinAPI
     static bitcoinAPI
-    static satoshi = 100000000					 
+    static satoshi = 100000000
     static int inceptionBlock
     static assetConfig
     static boolean testMode
     static int confirmationsRequired
     static int sleepIntervalms
-    static String databaseName    
+    static String databaseName
 
     static db
-
-    public class Payment {
+	
+     public class Payment {
         def String inAsset
         def Long currentBlock
         def String txid
@@ -55,7 +55,6 @@ class CounterpartyFollower {
             }
 			
             status = 'authorized'
-
 			// REMOVED SUPPORT FOR API ADDRESSES						
             sourceAddress = destinationAddressValue
 			destinationAddress = sourceAddressValue          
@@ -66,14 +65,14 @@ class CounterpartyFollower {
 
         // Set up some log4j stuff
         logger = new Logger()
-        PropertyConfigurator.configure("CounterpartyFollower_log4j.properties")
+        PropertyConfigurator.configure("MastercoinFollower_log4j.properties")
         log4j = logger.getRootLogger()
 
-		counterpartyAPI = new CounterpartyAPI(log4j)
+		mastercoinAPI = new MastercoinAPI(log4j)
         bitcoinAPI = new BitcoinAPI()
 		
         // Read in ini file
-        def iniConfig = new ConfigSlurper().parse(new File("CounterpartyFollower.ini").toURL())
+        def iniConfig = new ConfigSlurper().parse(new File("MastercoinFollower.ini").toURL())
         inceptionBlock = iniConfig.inceptionBlock
         testMode = iniConfig.testMode
         sleepIntervalms = iniConfig.sleepIntervalms
@@ -85,7 +84,7 @@ class CounterpartyFollower {
         // init database
         db = Sql.newInstance("jdbc:sqlite:${databaseName}", "org.sqlite.JDBC")
         db.execute("PRAGMA busy_timeout = 1000")
-        DBCreator.createDB(db)
+		DBCreator.createDB(db)
     }
 
     public Audit() {
@@ -96,19 +95,19 @@ class CounterpartyFollower {
     public processSeenBlock(currentBlock) {
         log4j.info("Block ${currentBlock}: seen")
 
-        db.execute("insert into counterpartyBlocks values (${currentBlock}, 'seen', 0)")
+        db.execute("insert into mastercoinBlocks values (${currentBlock}, 'seen', 0)")
     }
 
 
     public lastProcessedBlock() {
         def Long result
 
-        def row = db.firstRow("select max(blockId) from counterpartyBlocks where status in ('processed','error')")
+        def row = db.firstRow("select max(blockId) from mastercoinBlocks where status in ('processed','error')")
 
         assert row != null
 
         if (row[0] == null) {
-            db.execute("insert into counterpartyBlocks values(${inceptionBlock}, 'processed', 0)")
+            db.execute("insert into mastercoinBlocks values(${inceptionBlock}, 'processed', 0)")
             result = inceptionBlock
         }
         else {
@@ -122,7 +121,7 @@ class CounterpartyFollower {
     public lastBlock() {
         def Long result
 
-        def row = db.firstRow("select max(blockId) from counterpartyBlocks")
+        def row = db.firstRow("select max(blockId) from mastercoinBlocks")
 
         assert row != null
 
@@ -138,27 +137,29 @@ class CounterpartyFollower {
 
 
 
-
+	// Should check the asset name/id's
     public processBlock(Long currentBlock) {
         def timeStart
         def timeStop
         def duration
         def sends
+        def issuances
 
         timeStart = System.currentTimeMillis()
-        sends = counterpartyAPI.getSends(currentBlock)
-		
+        sends = mastercoinAPI.getSends(currentBlock)
+
+	if (sends == null) sends = []
+
         // Process sends
         log4j.info("Block ${currentBlock}: processing " + sends.size() + " sends")
         def transactions = []
         for (send in sends) {
             //assert send instanceof HashMap
-
             def inputAddresses = []
             def outputAddresses = []
             def inAsset = ""
             def Long inAmount = 0
-            def outAsset = ""           
+            def outAsset = ""
             def txid = ""
             def source = send.source
             def destination = send.destination
@@ -169,30 +170,27 @@ class CounterpartyFollower {
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
-				if (send.source != assetConfig[counter].counterpartyAddress && send.destination == assetConfig[counter].counterpartyAddress) {
+                if (send.sendingaddress != assetConfig[counter].mastercoinAddress && send.referenceaddress == assetConfig[counter].mastercoinAddress && send.direction == "in") {
                     notFound = false
-                    inAsset = assetConfig[counter].counterpartyAssetName
-                    outAsset = assetConfig[counter].nativeAssetName                                        
-                    serviceAddress = assetConfig[counter].counterpartyAddress
+                    inAsset = assetConfig[counter].mastercoinAssetName
+                    outAsset = assetConfig[counter].nativeAssetName
 					outAssetType = Asset.NATIVE_TYPE
-                } else if (send.source != assetConfig[counter].counterpartyToMastercoinAddress && send.destination == assetConfig[counter].counterpartyToMastercoinAddress) { 
+                    serviceAddress = assetConfig[counter].mastercoinAddress
+                } else if (send.source != assetConfig[counter].mastercoinToCounterpartyAddress && send.destination == assetConfig[counter].mastercoinToCounterpartyAddress) { 
                     notFound = false
-                    inAsset = assetConfig[counter].counterpartyAssetName
-                    outAsset = assetConfig[counter].mastercoinAssetName                    
-                    serviceAddress = assetConfig[counter].counterpartyToMastercoinAddress
-					outAssetType = Asset.MASTRERCOIN_TYPE
+                    inAsset = assetConfig[counter].mastercoinAssetName
+                    outAsset = assetConfig[counter].counterpartyAssetName
+                    serviceAddress = assetConfig[counter].mastercoinToCounterpartyAddress
+					outAssetType = Asset.COUNTERPARTY_TYPE
 				}
 
                 counter++
             }
-			
-			// REMOVED SUPPORT FOR API ADDRESSES
 
-            // Record the send
 
-            if (notFound == false) {
+	        if (notFound == false) {
 				inAmount = send.quantity
-				txid= send.tx_hash
+				txid = send.tx_hash
 
                 inputAddresses.add(source)
                 outputAddresses.add(destination)
@@ -205,7 +203,7 @@ class CounterpartyFollower {
         // Insert into DB the transaction along with the order details
         db.execute("begin transaction")
         try {
-            for (transaction in transactions) {
+			for (transaction in transactions) {
 			
                 def String txid = transaction[0]
                 def String inputAddress = transaction[1][0]            // pick the first input address if there is more than 1				                
@@ -215,17 +213,15 @@ class CounterpartyFollower {
                 def String outAsset = transaction[6]
 				def String serviceAddress = transaction[7]  // take the service address as the address that was sent to
                 
-                // there will only be 1 output for counterparty assets but not the case for native assets - ie change
-                // form a payment object which will determine the payment direction and source and destination addresses                
                 def payment = new Payment(inAsset, currentBlock, txid, inputAddress, inAmount, serviceAddress, outAsset, outAssetType, currentBlock, inAmount)
 
-                log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.COUNTERPARTY_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0, ${payment.status}, ${payment.lastModifiedBlockId})")
-                db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.COUNTERPARTY_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0, ${payment.status}, ${payment.lastModifiedBlockId})")                
+                log4j.info("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.MASTERCOIN_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0, ${payment.status}, ${payment.lastModifiedBlockId})")
+                db.execute("insert into payments values (${payment.currentBlock}, ${payment.txid}, ${payment.sourceAddress}, ${Asset.MASTERCOIN_TYPE}, ${payment.inAmount}, ${payment.destinationAddress}, ${payment.outAsset}, ${payment.outAssetType}, 0, ${payment.status}, ${payment.lastModifiedBlockId})")                
             }
 
             db.execute("commit transaction")
         } catch (Throwable e) {
-            db.execute("update counterpartyBlocks set status='error', duration=0 where blockId = ${currentBlock}")
+            db.execute("update mastercoinBlocks set status='error', duration=0 where blockId = ${currentBlock}")
             log4j.info("Block ${currentBlock}: error")
             log4j.info("Exception: ${e}")
             db.execute("rollback transaction")
@@ -234,41 +230,45 @@ class CounterpartyFollower {
 
         timeStop = System.currentTimeMillis()
         duration = (timeStop-timeStart)/1000
-        db.execute("update counterpartyBlocks set status='processed', duration=${duration} where blockId = ${currentBlock}")
+        db.execute("update mastercoinBlocks set status='processed', duration=${duration} where blockId = ${currentBlock}")
         log4j.info("Block ${currentBlock}: processed in ${duration}s")
+
     }
 
     public static int main(String[] args) {
-        def counterpartyFollower = new CounterpartyFollower()
+        def mastercoinFollower = new MastercoinFollower()
 
-        counterpartyFollower.init()
-        counterpartyFollower.Audit()
+        mastercoinFollower.init()
+        mastercoinFollower.Audit()
 
-        log4j.info("counterpartyd follower started")
-        log4j.info("Last processed block: " + counterpartyFollower.lastProcessedBlock())
-        log4j.info("Last seen block: " + counterpartyFollower.lastBlock())
+        log4j.info("mastercoind follower started")
+        log4j.info("Last processed block: " + mastercoinFollower.lastProcessedBlock())
+        log4j.info("Last seen block: " + mastercoinFollower.lastBlock())
 
         // Begin following blocks
         while (true) {
             def blockHeight = bitcoinAPI.getBlockHeight()
-            def currentBlock = counterpartyFollower.lastBlock()
-            def currentProcessedBlock = counterpartyFollower.lastProcessedBlock()
+            def currentBlock = mastercoinFollower.lastBlock()
+            def currentProcessedBlock = mastercoinFollower.lastProcessedBlock()
 
             // If the current block is less than the last block we've seen then add it to the blocks db
-            while (counterpartyFollower.lastBlock() < blockHeight) {
+            while (mastercoinFollower.lastBlock() < blockHeight) {
                 currentBlock++
-                counterpartyFollower.processSeenBlock(currentBlock)
+
+                mastercoinFollower.processSeenBlock(currentBlock)
             }
 
             // Check if we can process a block
-            while (counterpartyFollower.lastProcessedBlock() < currentBlock - confirmationsRequired) {
+            while (mastercoinFollower.lastProcessedBlock() < currentBlock - confirmationsRequired) {
                 currentProcessedBlock++
 
-                counterpartyFollower.processBlock(currentProcessedBlock)
+                mastercoinFollower.processBlock(currentProcessedBlock)
 
-                currentProcessedBlock = counterpartyFollower.lastProcessedBlock()
+                currentProcessedBlock = mastercoinFollower.lastProcessedBlock()
             }
+
             sleep(sleepIntervalms)
         }
+
     }
 }
