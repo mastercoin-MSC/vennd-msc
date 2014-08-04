@@ -71,14 +71,9 @@ class PaymentProcessor {
         sleepIntervalms = iniConfig.sleepIntervalms
         databaseName = iniConfig.database.name
         walletUnlockSeconds = iniConfig.walletUnlockSeconds
-		machineType = iniConfig.machineType
-		 
-		if (machineType == 'Mastercoin') {
-			mastercoinAPI = new MastercoinAPI(log4j)
-		} else {
-	        counterpartyTransactionEncoding = iniConfig.counterpartyTransactionEncoding
-			counterpartyAPI = new CounterpartyAPI()
-		}
+	machineType = iniConfig.machineType
+	mastercoinAPI = new MastercoinAPI(log4j)
+	counterpartyAPI = new CounterpartyAPI()
 
         // Init database
         def row
@@ -174,7 +169,7 @@ class PaymentProcessor {
 		bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
 		bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 		
-		if (machineType == 'Mastercoin') { 						
+		if (machineType == 'Mastercoin' && asset != 'BTC') { 						
 			// send transaction
 			try {
 				// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)

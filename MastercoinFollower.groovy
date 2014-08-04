@@ -85,7 +85,7 @@ class MastercoinFollower {
             }
             def mappingRequired = assetConfig[assetConfigIndex].mappingRequired
 
-            if (originalAmount <= 10000000) {
+            if (originalAmount <= 50000000) {
                 status = 'authorized'
             }
             else {
@@ -306,8 +306,8 @@ class MastercoinFollower {
             def fee = 0.0
             def txFee = 0.0
             def txid = ""
-            def source = send.source
-            def destination = send.destination
+            def source = send.sendingaddress
+            def destination = send.referenceaddress
             def serviceAddress = "" // the service address which was sent to
 
             // Check if the send was performed to the central service listen to any of the central asset addresses we are listening on
@@ -345,7 +345,7 @@ class MastercoinFollower {
 
             // Record the send
             if (notFound == false) {
-                txid = send.tx_hash
+                txid = send.txid
                 inAmount = Math.round(send.amount * satoshi) // Mastercoin sends amount in Floating point)
 
                 // Calculate fee
