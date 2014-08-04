@@ -94,7 +94,7 @@ class MastercoinFollower {
 
             // Check if the send was performed TO an address registered via the API
             // If it was then payment should be swept into the central address
-            row = db.firstRow("select * from addressMaps where mastercoinPaymentAddress = ${destinationAddressValue}")
+            row = db.firstRow("select * from addressMaps where counterpartyPaymentAddress = ${destinationAddressValue}")
             if (row != null) {
                 sourceAddress = destinationAddressValue
                 destinationAddress = assetConfig[assetConfigIndex].mastercoinAddress
@@ -103,7 +103,7 @@ class MastercoinFollower {
             else {
                 // Check if the send was performed FROM an address registered via the API to the central address
                 // If it was then payment should be made from the central address to the external address
-                row = db.firstRow ("select * from addressMaps where mastercoinPaymentAddress = ${sourceAddressValue}")
+                row = db.firstRow ("select * from addressMaps where counterpartyPaymentAddress = ${sourceAddressValue}")
                 if (row != null) {
                     sourceAddress = assetConfig[assetConfigIndex].nativeAddress
                     destinationAddress = row.externalAddress
@@ -164,7 +164,7 @@ class MastercoinFollower {
             if (it.value.issuanceDivisible instanceof groovy.util.ConfigObject) { issuanceDivisible = true} else {issuanceDivisible = it.value.issuanceDivisible}
             if (it.value.issuanceDescription instanceof groovy.util.ConfigObject) { issuanceDescription = ""} else {issuanceDescription = it.value.issuanceDescription}
 			
-			assert issuanceDependent != True	// Issuance not supported in MSC yet
+			assert issuanceDependent != true	// Issuance not supported in MSC yet
 
             def currentAsset = new Asset(it.value.mastercoinAssetName, it.value.nativeAssetName, it.value.mastercoinAddress, it.value.nativeAddress, it.value.txFee, it.value.feePercentage, it.value.mappingRequired, issuanceDependent, issuanceSource, issuanceAsset, issuanceDivisible, issuanceDescription)
             assetConfig.add(currentAsset)
@@ -187,7 +187,7 @@ class MastercoinFollower {
         db.execute("create table if not exists audit(blockId string, txid string, description string)")
         db.execute("create table if not exists payments(blockId integer, sourceTxid string, sourceAddress string, destinationAddress string, outAsset string, outAmount integer, status string, lastUpdatedBlockId integer)")
         db.execute("create table if not exists issuances(blockId integer, sourceTxid string, destinationAddress string, asset string, amount integer, divisibility string, status string, lastUpdatedBlockId integer)")
-        db.execute("create table if not exists addressMaps (mastercoinPaymentAddress string, nativePaymentAddress string, externalAddress string, mastercoinAddress string, mastercoinAssetName string, nativeAssetName string, UDF1 string, UDF2 string, UDF3 string, UDF4 string, UDF5 string)")
+        db.execute("create table if not exists addressMaps (counterpartyPaymentAddress string, nativePaymentAddress string, externalAddress string, counterpartyAddress string, counterpartyAssetName string, nativeAssetName string, UDF1 string, UDF2 string, UDF3 string, UDF4 string, UDF5 string)")
 
         db.execute("create unique index if not exists blocks1 on blocks(blockId)")
         db.execute("create index if not exists transactions1 on transactions(blockId)")
@@ -202,10 +202,10 @@ class MastercoinFollower {
         db.execute("create index if not exists payments1 on payments(blockId)")
         db.execute("create index if not exists payments1 on payments(sourceTxid)")
         db.execute("create index if not exists issuances1 on issuances(blockId)")
-        db.execute("create unique index if not exists addressMaps1 on addressMaps(mastercoinPaymentAddress)")
+        db.execute("create unique index if not exists addressMaps1 on addressMaps(counterpartyPaymentAddress)")
         db.execute("create unique index if not exists addressMaps2 on addressMaps(nativePaymentAddress)")
         db.execute("create unique index if not exists addressMaps3 on addressMaps(externalAddress)")
-        db.execute("create unique index if not exists addressMaps3 on addressMaps(mastercoinAddress)")
+        db.execute("create unique index if not exists addressMaps3 on addressMaps(counterpartyAddress)")
 
         // Check vital tables exist
         row = db.firstRow("select name from sqlite_master where type='table' and name='blocks'")
@@ -314,7 +314,7 @@ class MastercoinFollower {
             def notFound = true
             def counter = 0
             while (notFound && counter <= assetConfig.size()-1) {
-                if (send.source != assetConfig[counter].mastercoinAddress && send.destination == assetConfig[counter].mastercoinAddress) {
+                if (send.sendingaddress != assetConfig[counter].mastercoinAddress && send.referenceaddress == assetConfig[counter].mastercoinAddress) {
                     notFound = false
                     inAsset = assetConfig[counter].mastercoinAssetName
                     outAsset = assetConfig[counter].nativeAssetName
@@ -327,10 +327,10 @@ class MastercoinFollower {
             }
 
             // Check if a send was performed to an address registered via the API
-            def row = db.firstRow("select * from addressMaps where mastercoinPaymentAddress = ${destination}")
+            def row = db.firstRow("select * from addressMaps where counterpartyPaymentAddress = ${destination}")
             if (row != null) {
                 notFound = false
-                inAsset = row.mastercoinAssetName
+                inAsset = row.counterpartyAssetName
                 outAsset = row.nativeAssetName
                 def assetConfigIndex = assetConfig.findIndexOf { a ->
                     a.mastercoinAssetName == send.asset
@@ -340,13 +340,13 @@ class MastercoinFollower {
                 assert outAsset == assetConfig[assetConfigIndex].nativeAssetName
                 fee = assetConfig[assetConfigIndex].feePercentage
                 txFee = assetConfig[assetConfigIndex].txFee
-                serviceAddress = row.mastercoinPaymentAddress
+                serviceAddress = row.counterpartyPaymentAddress
             }
 
             // Record the send
             if (notFound == false) {
                 txid = send.tx_hash
-                inAmount = Math.round(send.quantity * satoshi // Mastercoin sends amount in Floating point)
+                inAmount = Math.round(send.amount * satoshi) // Mastercoin sends amount in Floating point)
 
                 // Calculate fee
                 def amountMinusTX

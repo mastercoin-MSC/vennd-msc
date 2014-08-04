@@ -46,7 +46,7 @@ public class VenndNativeFollower {
         def boolean mappingRequired
 
         public Asset(String outAssetNameValue, String nativeAssetNameValue, String outAddressValue, String nativeAddressValue, BigDecimal txFeeValue, BigDecimal feePercentageValue, boolean mappingRequiredValue) {
-            outAssetName = outAssetNameValueValue
+            outAssetName = outAssetNameValue
             nativeAssetName = nativeAssetNameValue
             outAddress = outAddressValue
             nativeAddress = nativeAddressValue

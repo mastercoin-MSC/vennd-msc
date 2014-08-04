@@ -1,4 +1,5 @@
 /**
+
  * Created by jeremy on 1/04/14.
  */
 
@@ -19,7 +20,8 @@ class PaymentProcessor {
     static String databaseName
     static String counterpartyTransactionEncoding
     static int walletUnlockSeconds
-	static String machineType 
+    static String machineType 
+    static satoshi = 100000000
 
     static logger
     static log4j
@@ -176,7 +178,7 @@ class PaymentProcessor {
 			// send transaction
 			try {
 				// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
-				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset, 1.0*amount/satoshi, testMode)
+				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset.toString(), 1.0*amount/satoshi, testMode)
 				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 			} catch (Throwable e) {
