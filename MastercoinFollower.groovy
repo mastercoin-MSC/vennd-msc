@@ -161,8 +161,8 @@ class MastercoinFollower {
             def Long inAmount = 0
             def outAsset = ""
             def txid = ""
-            def source = send.source
-            def destination = send.destination
+            def source = send.sendingaddress
+            def destination = send.referenceaddress
             def serviceAddress = "" // the service address which was sent to
 			def outAssetType = ""
 
@@ -190,7 +190,7 @@ class MastercoinFollower {
 
 	        if (notFound == false) {
 				inAmount = send.amount
-				txid = send.tx_hash
+				txid = send.txid
 
                 inputAddresses.add(source)
                 outputAddresses.add(destination)
