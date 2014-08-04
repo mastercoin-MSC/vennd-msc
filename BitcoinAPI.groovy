@@ -77,27 +77,6 @@ class BitcoinAPI {
 
         return result.get()
     }
-	
-	public sendToAddress(String address, BigDecimal amount, String comment = "") {
-        def result = httpAsync.request( POST, JSON) { req ->
-            body = [method : 'sendtoaddress',
-                    id : 'test',
-                    params : [address, 1.0 * Math.round(amount * satoshi) / satoshi, comment]
-            ]
-
-            response.success = { resp, json ->
-                return json.result
-            }
-        }
-
-        assert result instanceof java.util.concurrent.Future
-        while ( ! result.done ) {
-            Thread.sleep(100)
-        }
-
-        return result.get()
-    }
-
 
     public getRawTransaction(tx_id) {
         def result = httpAsync.request( POST, JSON) { req ->
