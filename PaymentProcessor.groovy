@@ -72,8 +72,11 @@ class PaymentProcessor {
         databaseName = iniConfig.database.name
         walletUnlockSeconds = iniConfig.walletUnlockSeconds
 	machineType = iniConfig.machineType
-	mastercoinAPI = new MastercoinAPI(log4j)
-	counterpartyAPI = new CounterpartyAPI()
+	if (machineType == 'Mastercoin') { 
+		mastercoinAPI = new MastercoinAPI(log4j) 
+	} else {
+		counterpartyAPI = new CounterpartyAPI()
+	}
 
         // Init database
         def row
@@ -169,19 +172,22 @@ class PaymentProcessor {
 		bitcoinAPI.lockBitcoinWallet() // Lock first to ensure the unlock doesn't fail
 		bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 		
-		if (machineType == 'Mastercoin' && asset != 'BTC') { 						
-			// send transaction
-			try {
-				// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
-				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset.toString(), 1.0*amount/satoshi, testMode)
-				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-			} catch (Throwable e) {
-				log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-				db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+		if (machineType == 'Mastercoin') {
+			if (asset != 'BTC') { 
+				// send transaction
+				try {
+					// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
+					mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset.toString(), 1.0*amount/satoshi, testMode)
+					log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				} catch (Throwable e) {
+					log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 	
-				assert e == null
-			}							
+					assert e == null
+				}
+			} else {
+			}
 		} else {
 			// Create the (unsigned) counterparty send transaction
 			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)
