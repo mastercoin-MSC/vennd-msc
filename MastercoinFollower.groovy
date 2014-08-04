@@ -176,7 +176,7 @@ class MastercoinFollower {
                     outAsset = assetConfig[counter].nativeAssetName
 					outAssetType = Asset.NATIVE_TYPE
                     serviceAddress = assetConfig[counter].mastercoinAddress
-                } else if (send.source != assetConfig[counter].mastercoinToCounterpartyAddress && send.destination == assetConfig[counter].mastercoinToCounterpartyAddress) { 
+                } else if (send.sendingaddress != assetConfig[counter].mastercoinToCounterpartyAddress && send.referenceaddress == assetConfig[counter].mastercoinToCounterpartyAddress) { 
                     notFound = false
                     inAsset = assetConfig[counter].mastercoinAssetName
                     outAsset = assetConfig[counter].counterpartyAssetName
@@ -189,7 +189,7 @@ class MastercoinFollower {
 
 
 	        if (notFound == false) {
-				inAmount = send.quantity
+				inAmount = send.amount
 				txid = send.tx_hash
 
                 inputAddresses.add(source)
