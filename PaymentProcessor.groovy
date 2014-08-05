@@ -71,7 +71,11 @@ class PaymentProcessor {
         sleepIntervalms = iniConfig.sleepIntervalms
         databaseName = iniConfig.database.name
         walletUnlockSeconds = iniConfig.walletUnlockSeconds
-	machineType = iniConfig.machineType
+		if (iniConfig.machineType instanceof groovy.util.ConfigObject) {
+			machineType = "Counterparty"   // backward compatibility
+		} else {
+			machineType = iniConfig.machineType
+		}
 	if (machineType == 'Mastercoin') { 
 		mastercoinAPI = new MastercoinAPI(log4j) 
 	} else {

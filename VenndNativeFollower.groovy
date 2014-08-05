@@ -174,8 +174,11 @@ public class VenndNativeFollower {
         confirmationsRequired = iniConfig.confirmationsRequired
         outAssetNonDivisibleRoundRule = iniConfig.outAssetNonDivisibleRoundRule
         outAssetMultiplier = iniConfig.outAssetMultiplier	
-		machineType = iniConfig.machineType
-
+		if (iniConfig.machineType instanceof groovy.util.ConfigObject) {
+			machineType = "Counterparty"   // backward compatibility
+		} else {
+			machineType = iniConfig.machineType
+		}
         assetConfig = []
         iniConfig.asset.each { it ->
 			def currentAsset
