@@ -173,21 +173,31 @@ class PaymentProcessor {
 		bitcoinAPI.unlockBitcoinWallet(walletPassphrase, 30)
 		
 		if (machineType == 'Mastercoin') {
-			def tmpAsset = asset
-			if (asset == 'BTC') { 		
-				tmpAsset = "0"
-			}
-			// send transaction
-			try {
-				// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
-				mastercoinAPI.sendAsset(sourceAddress, destinationAddress, tmpAsset.toString(), 1.0*amount/satoshi, testMode)
-				log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-				db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-			} catch (Throwable e) {
-				log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-				db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
-						assert e == null
-			}
+			if (asset != 'BTC') { 
+				// send transaction
+				try {
+					// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
+					mastercoinAPI.sendAsset(sourceAddress, destinationAddress, asset.toString(), 1.0*amount/satoshi, testMode)
+					log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				} catch (Throwable e) {
+					log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					assert e == null
+				} 
+			} else {
+				// send transaction
+				try {
+					// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
+					def account = bitcoinAPI.getAccount(sourceAddress)
+					bitcoinAPI.sendFrom(account, destinationAddress, asset.toString(), 1.0*amount/satoshi)
+					log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+				} catch (Throwable e) {
+					log4j.info("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
+					assert e == null
+				} 
 		} else {
 			// Create the (unsigned) counterparty send transaction
 			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)

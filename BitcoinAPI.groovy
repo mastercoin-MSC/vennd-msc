@@ -193,7 +193,76 @@ class BitcoinAPI {
 
         return result.get()
     }
+	
+	public getAccount(address) {
+		try {
+            def paramsJSON
+            def myParams = [method: 'getaccount',
+                    id: 'test',
+                    params: [address]
+            ]
 
+            def result = httpAsync.request(POST, JSON) { req ->
+                body = myParams
+
+                paramsJSON = new groovy.json.JsonBuilder(myParams)
+
+                response.success = { resp, json ->
+                    return json.result
+                }
+
+                response.failure = { resp ->
+                    println "GetAccount failed"
+                    assert resp.responseBase == null
+                }
+            }
+
+            assert result instanceof java.util.concurrent.Future
+            while (!result.done) {
+                Thread.sleep(100)
+            }
+
+            return result.get()
+        }
+        catch (Throwable e) {
+            assert e == null
+        }
+	
+	
+	public sendFrom(account, toaddress, amount) {
+		try {
+            def paramsJSON
+            def myParams = [method: 'sendfrom',
+                    id: 'test',
+                    params: [account, toaddress, amount]
+            ]
+
+            def result = httpAsync.request(POST, JSON) { req ->
+                body = myParams
+
+                paramsJSON = new groovy.json.JsonBuilder(myParams)
+
+                response.success = { resp, json ->
+                    return json.result
+                }
+
+                response.failure = { resp ->
+                    println "SendFrom failed"
+                    assert resp.responseBase == null
+                }
+            }
+
+            assert result instanceof java.util.concurrent.Future
+            while (!result.done) {
+                Thread.sleep(100)
+            }
+
+            return result.get()
+        }
+        catch (Throwable e) {
+            assert e == null
+        }
+	}
 
     private init(String iniFile) {
         // Read in ini file
