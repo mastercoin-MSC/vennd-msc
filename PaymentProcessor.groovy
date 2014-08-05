@@ -190,7 +190,7 @@ class PaymentProcessor {
 				try {
 					// Mastercoin works with fractional amounts and not willets (i.e. mastercoin's satoshis)
 					def account = bitcoinAPI.getAccount(sourceAddress)
-					bitcoinAPI.sendFrom(account, destinationAddress, asset.toString(), 1.0*amount/satoshi)
+					bitcoinAPI.sendFrom(account, destinationAddress, 1.0*amount/satoshi)
 					log4j.info("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 					db.execute("update payments set status='complete', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 				} catch (Throwable e) {
@@ -198,6 +198,7 @@ class PaymentProcessor {
 					db.execute("update payments set status='error', lastUpdatedBlockId = ${currentBlock} where blockId = ${blockIdSource} and sourceTxid = ${payment.txid}")
 					assert e == null
 				} 
+			}
 		} else {
 			// Create the (unsigned) counterparty send transaction
 			def unsignedTransaction = counterpartyAPI.createSend(sourceAddress, destinationAddress, asset, amount, testMode, log4j)

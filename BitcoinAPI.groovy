@@ -227,6 +227,7 @@ class BitcoinAPI {
         catch (Throwable e) {
             assert e == null
         }
+    }
 	
 	
 	public sendFrom(account, toaddress, amount) {
@@ -262,7 +263,7 @@ class BitcoinAPI {
         catch (Throwable e) {
             assert e == null
         }
-	}
+    }
 
     private init(String iniFile) {
         // Read in ini file
