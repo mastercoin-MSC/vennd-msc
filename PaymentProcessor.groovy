@@ -177,6 +177,7 @@ class PaymentProcessor {
 				return assetRec
 			} 
 		}
+		return null
 	}
 
     public pay_dividend(Long currentBlock, Payment payment,Long dividend_percent, outAmount, relevantAsset)
@@ -361,21 +362,21 @@ class PaymentProcessor {
 //            }
 
             if (payment != null) {
-				def relevantAsset = findAssetConfig(payment)
+				def relevantAsset = paymentProcessor.findAssetConfig(payment)
 
                 if (payment.inAssetType == Asset.NATIVE_TYPE){					
 					log4j.info("--------------BUY TRANSACTION-------------")
 					// This is an issuing transaction, we need to pay dividend
-					def zoozAmount = paymentProcessor.computeZoozAmount(payment.inAmount,asset)
+					def zoozAmount = paymentProcessor.computeZoozAmount(payment.inAmount,relevantAsset)
 					paymentProcessor.pay_dividend(blockHeight, payment, dividend_percent, zoozAmount,relevantAsset)
 					paymentProcessor.pay(blockHeight, payment,dividend_percent, zoozAmount)
 				} else if (payment.outAssetType == Asset.NATIVE_TYPE) {					
 					log4j.info("--------------BURN TRANSACTION-------------")
-					paymentProcessor.pay(blockHeight, payment,0, paymentProcessor.computeNativeAmount(payment.inAmount, asset))					
+					paymentProcessor.pay(blockHeight, payment,0, paymentProcessor.computeNativeAmount(payment.inAmount, relevantAsset))					
 				} else if ((payment.inAssetType == Asset.MASTERCOIN_TYPE && payment.outAssetType == Asset.COUNTERPARTY_TYPE ) || 				
 					(payment.inAssetType == Asset.COUNTERPARTY_TYPE && payment.outAssetType == Asset.MASTERCOIN_TYPE)) {
 					log4j.info("----------------- EXCHANGE TRANSACTION -----------------")
-					def outAmount = computeExchangedAmount(payment.inAmount,asset)
+					def outAmount = computeExchangedAmount(payment.inAmount,relevantAsset)
 					paymentProcessor.pay(blockHeight, payment,0, outAmount)									
 				} else {				
 					log4j.info("----------------- UNKOWN TRANSACTION TYPE ??? -----------------")
@@ -393,12 +394,12 @@ class PaymentProcessor {
     }
 	
 	// Functions for exchange rates!!! 
-	private computeZoozAmount(Long nativeAmount) {
+	private computeZoozAmount(Long nativeAmount, asset) {
 		return nativeAmount * 200.0
 	}
 	
 	
-	private computeNativeAmount(Long zoozAmount) { 
+	private computeNativeAmount(Long zoozAmount, asset) { 
 		return zoozAmount / 200
 	}
 

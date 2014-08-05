@@ -189,14 +189,14 @@ class MastercoinFollower {
 
 
 	        if (notFound == false) {
-				inAmount = send.amount
+				inAmount = Math.round(send.amount * satoshi)
 				txid = send.txid
 
                 inputAddresses.add(source)
                 outputAddresses.add(destination)
 
                 transactions.add([txid, inputAddresses, outputAddresses, inAsset,inAmount , outAssetType, outAsset, serviceAddress])
-                log4j.info("Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${serviceAddress} (${outAssetType}) ${inAmount/satoshi} ${inAsset} -> ${outAsset} )")
+                log4j.info("Block ${currentBlock} found service call: ${currentBlock} ${txid} ${inputAddresses} ${serviceAddress} (${outAssetType}) ${inAmount} ${inAsset} -> ${outAsset} )")
             }
         }
 

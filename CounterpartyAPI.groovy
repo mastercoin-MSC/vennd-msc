@@ -111,10 +111,10 @@ class CounterpartyAPI {
 	
 	public getLastBroadcastOfStream(address, datastream_text) { 
 		def filterValue = new FilterValue('address', '==', address)
-		def secondFilterValue = new FilteValue('text', '==', datastream_text)
+		def secondFilterValue = new FilterValue('text', '==', datastream_text)
         def filters = new Filters(filterValue)
 		filters.Add(secondFilterValue)
-		return sendRPCMessage('get_broadcasts', ["filters:" filters, "limit":1, "orderby": 'timestamp', order_dir='desc'])
+		return sendRPCMessage('get_broadcasts', ["filters": filters, "limit":1, "orderby": 'timestamp', 'order_dir':'desc'])
 	}
 
 
@@ -167,7 +167,7 @@ class CounterpartyAPI {
 	}
 
     public createBroadcast(String sourceAddress, BigDecimal feeFraction, String text, int timestamp, BigDecimal value) {
-		def result = sendRPCMessage('create_broadcast', ["sourceAddress, feeFraction, text, timestamp, value])
+		def result = sendRPCMessage('create_broadcast', [sourceAddress, feeFraction, text, timestamp, value])
 		if (result == null) { 
 			log4j.info("create_broadcast failed - null was returned")
 			assert result != null
