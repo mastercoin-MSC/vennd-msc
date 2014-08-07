@@ -1,3 +1,9 @@
+Private Mastercoin Edition
+==========================
+
+This version will be used to develop a plugin system so coins can be added without hard forking the vendd repo.
+
+
 Vennd
 =====
 
